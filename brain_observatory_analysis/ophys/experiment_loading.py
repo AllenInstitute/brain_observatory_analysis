@@ -10,7 +10,7 @@ from collections import ChainMap
 import pandas as pd
 import multiprocessing as mp
 
-import expt_table_fix
+from . import expt_table_fix
 import brain_observatory_analysis.utilities.file_utils as fu
 
 from allensdk.brain_observatory.behavior.behavior_project_cache import \
@@ -156,6 +156,7 @@ def display_expt_table(df, extra_cols=[]):
 # loading experiments
 ########################################################################
 
+
 def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
                      multi: bool = True,
                      return_failed=False,
@@ -250,8 +251,8 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
         # log the exception
         print(e)
         logging.exception(f"ophys_expt_id: {ophys_expt_id}")
-        #logger.exception(f"Failed to load expt: {ophys_expt_id}")
-        #print(f"Failed to load expt: {ophys_expt_id}")
+        # logger.exception(f"Failed to load expt: {ophys_expt_id}")
+        # print(f"Failed to load expt: {ophys_expt_id}")
         return {ophys_expt_id: None}
 
 
@@ -290,7 +291,7 @@ def get_ophys_expt_multi(expt_ids: list,
     ophys_expt_dicts = dict(ChainMap(*result))
 
     if return_failed:
-        return ophys_expt_dicts, failed_expts
+        return ophys_expt_dicts,  # failed_expts # TODO: see if needed
     else:
         return ophys_expt_dicts
 

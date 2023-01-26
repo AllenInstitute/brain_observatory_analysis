@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
 
-from experiment_loading import start_lamf_analysis, load_ophys_expts
-
+from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
 # from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
 #     BehaviorOphysExperimentDev
-from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
-    import BehaviorOphysExperiment
+# from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
+#     import BehaviorOphysExperiment
 
 
 class ExperimentGroup():
@@ -15,7 +14,7 @@ class ExperimentGroup():
 
     Parameters
     ----------
-    expt_table : pd.DataFrame, optional
+    expt_table_preload : pd.DataFrame, optional
         table of experiments to load, by default None
     filters : dict, optional
         key value pairs to filter expt_table, by default {}

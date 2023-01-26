@@ -94,6 +94,10 @@ def save_tiff(images, filename):
         for image in images:
             tif.save(image)
 
+########################################################################
+# from_lims
+########################################################################
+
 
 def get_motion_correction_crop_xy_range(oeid):
     """Get x-y ranges to crop motion-correction frame rolling

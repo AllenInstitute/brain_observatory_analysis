@@ -1,7 +1,5 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from pathlib import Path
 from typing import Union
 
@@ -15,7 +13,8 @@ from .experiment_group import ExperimentGroup
 
 
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
-                                          event_type: str = "changes"):
+                                          event_type: str = "changes",
+                                          load_from_file: bool = True) -> pd.DataFrame:
     """
     Get mean stimulus response for each cell in the experiment group
 
@@ -46,7 +45,7 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
     for expt_id, expt in expt_group.experiments.items():
         try:
             sdf = _get_stimulus_response_df(expt, event_type=event_type,
-                                            load_from_file=True,
+                                            load_from_file=load_from_file,
                                             save_to_file=False)
 
             mdf = get_standard_mean_df(sdf)
@@ -58,10 +57,11 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
 
     mdfs = pd.concat(mdfs).reset_index(drop=True)
 
-    # cells_filtered has expt_table infocd
+    # cells_filtered has expt_table info that is useful
     expt_table = expt_group.expt_table
     oct = expt_group.grp_ophys_cells_table.reset_index()
 
+    # calculate more metrics, will likely move to own functions
     mdfs["mean_baseline_diff"] = mdfs["mean_response"] - \
         mdfs["mean_baseline"]
     mdfs["mean_baseline_diff_trace"] = mdfs["mean_trace"] - \
@@ -94,7 +94,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
         If True, save the stimulus response dataframe to a file
     load_from_file: bool
         If True, load the stimulus response dataframe from a file
-    
+
     Returns
     -------
     pd.DataFrame
@@ -114,6 +114,8 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
         raise ValueError("save_to_file and load_from_file cannot both be True")
 
     expt_id = experiment.metadata["ophys_experiment_id"]
+
+    cache_dir = Path(cache_dir)
 
     # dev object can report correct frame rate, but different frame
     # rate are possible across sessions, this would produce different
@@ -164,6 +166,7 @@ def get_standard_mean_df(df):
                       exclude_omitted_from_pref_stim=True)
     return mdf
 
+
 # TODO: clean + document
 def get_mean_df(stim_response_df: pd.DataFrame,
                 conditions=['cell', 'change_image_name'],
@@ -179,7 +182,7 @@ def get_mean_df(stim_response_df: pd.DataFrame,
     2) apply get_mean_sem_trace()
     3) "response_window_duration_seconds" in df already
     4) "frame_rate" in df already
-    5) get_pre_stim: 
+    5) get_pre_stim:
     """
     window = window_around_timepoint_seconds
     response_window_duration = response_window_duration_seconds
@@ -231,6 +234,72 @@ def get_mean_df(stim_response_df: pd.DataFrame,
         mdf = mdf.drop(columns=['index'])
     return mdf
 
+
+####################################################################################################
+# trace metrics
+####################################################################################################
+
+
+def get_successive_frame_list(timepoints_array, timestanps):
+    # This is a modification of get_nearest_frame for speedup
+    #  This implementation looks for the first 2p frame consecutive to the stim
+    successive_frames = np.searchsorted(timestanps, timepoints_array)
+
+    return successive_frames
+
+
+def get_trace_around_timepoint(timepoint, trace, timestamps, window, frame_rate):
+    #   frame_for_timepoint = get_nearest_frame(timepoint, timestamps)
+    frame_for_timepoint = get_successive_frame_list(timepoint, timestamps)
+    lower_frame = frame_for_timepoint + (window[0] * frame_rate)
+    upper_frame = frame_for_timepoint + (window[1] * frame_rate)
+    trace = trace[int(lower_frame):int(upper_frame)]
+    timepoints = timestamps[int(lower_frame):int(upper_frame)]
+    return trace, timepoints
+
+
+def get_responses_around_event_times(trace, timestamps, event_times, frame_rate, window=[-2, 3]):
+    responses = []
+    for event_time in event_times:
+        response, times = get_trace_around_timepoint(event_time, trace, timestamps,
+                                                     frame_rate=frame_rate, window=window)
+        responses.append(response)
+    responses = np.asarray(responses)
+    return responses
+
+
+def get_mean_in_window(trace, window, frame_rate, use_events=False):
+    mean = np.nanmean(trace[int(window[0] * frame_rate): int(window[1] * frame_rate)])
+    return mean
+
+
+def get_sd_in_window(trace, window, frame_rate):
+    std = np.std(
+        trace[int(window[0] * frame_rate): int(window[1] * frame_rate)])
+    return std
+
+
+def get_n_nonzero_in_window(trace, window, frame_rate):
+    datapoints = trace[int(np.round(window[0] * frame_rate)): int(np.round(window[1] * frame_rate))]
+    n_nonzero = len(np.where(datapoints > 0)[0])
+    return n_nonzero
+
+
+def get_sd_over_baseline(trace, response_window, baseline_window, frame_rate):
+    baseline_std = get_sd_in_window(trace, baseline_window, frame_rate)
+    response_mean = get_mean_in_window(trace, response_window, frame_rate)
+    return response_mean / (baseline_std)
+
+
+def get_p_val(trace, response_window, frame_rate):
+    from scipy import stats
+    response_window_duration = response_window[1] - response_window[0]
+    baseline_end = int(response_window[0] * frame_rate)
+    baseline_start = int((response_window[0] - response_window_duration) * frame_rate)
+    stim_start = int(response_window[0] * frame_rate)
+    stim_end = int((response_window[0] + response_window_duration) * frame_rate)
+    (_, p) = stats.f_oneway(trace[baseline_start:baseline_end], trace[stim_start:stim_end])
+    return p
 
 ####################################################################################################
 # metrics for grouped stim_response_df
@@ -342,8 +411,7 @@ def compute_reliability(group, window=[-3, 3], response_window_duration=0.5, fra
     # only for portion of the trace after the change time or flash onset time
 
     onset = int(np.abs(window[0]) * frame_rate)
-    response_window = [onset, onset +
-                       (int(response_window_duration * frame_rate))]
+    response_window = [onset, onset + (int(response_window_duration * frame_rate))]
     traces = group['trace'].values
     traces = np.vstack(traces)
     if traces.shape[0] > 5:
@@ -355,6 +423,8 @@ def compute_reliability(group, window=[-3, 3], response_window_duration=0.5, fra
         reliability = np.nan
         correlation_values = []
     return pd.Series({'reliability': reliability, 'correlation_values': correlation_values})
+
+
 ####################################################################################################
 # Annotate various data frames
 ####################################################################################################
@@ -510,8 +580,7 @@ def annotate_flashes_with_reward_rate(dataset):
     trials = dataset.trials[dataset.trials.trial_type != 'aborted']
     flashes = dataset.stimulus_table.copy()
     for change_time in trials.change_time.values:
-        reward_rate = trials[trials.change_time ==
-                             change_time].reward_rate.values[0]
+        reward_rate = trials[trials.change_time == change_time].reward_rate.values[0]
         for start_time in flashes.start_time:
             if (start_time < change_time) and (start_time > last_time):
                 reward_rate_by_frame.append(reward_rate)
