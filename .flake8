@@ -1,0 +1,6 @@
+[flake8]
+ignore =
+    # ignore line too long error
+    E501,
+    # ignore closing bracket does not match indent of opening bracket's line
+    E123,   
