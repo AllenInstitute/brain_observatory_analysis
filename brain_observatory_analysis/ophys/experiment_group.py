@@ -1,8 +1,13 @@
-import mjd_dev.notebook_utils as nu
 import pandas as pd
 import numpy as np
 
-from .experiment_loading import start_lamf_analysis, load_ophys_expts
+from experiment_loading import start_lamf_analysis, load_ophys_expts
+
+
+# from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
+#     BehaviorOphysExperimentDev
+from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
+    import BehaviorOphysExperiment
 
 
 class ExperimentGroup():
@@ -30,18 +35,19 @@ class ExperimentGroup():
     """
 
     def __init__(self,
-                 expt_table: pd.DataFrame = None,
+                 expt_table_preload: pd.DataFrame = None,
                  filters: dict = {},
                  dev: bool = False,
                  test_mode: bool = False):
         self.dev = dev
+        self.expt_table_preload = expt_table_preload
         self.expt_list_preload = self.expt_table_preload.index.tolist()
         self.filters = filters
         self.test_mode = test_mode
         self.expt_list = []  # set after loading
         self.expt_table = pd.DataFrame()  # set after loading
-        self.experiments = {}
-        self.failed_to_load = []
+        self.experiments = {}  # set after loading
+        self.failed_to_load = []  # set after loading
         self.grp_ophys_cells_table = pd.DataFrame()
 
         if self.filters:
@@ -51,8 +57,8 @@ class ExperimentGroup():
             self._filter_expt_table()
 
         if self.expt_table_preload is None:
-            self.expt_table_preload = nu.start_lamf_analysis()
-            # TODO: make regular with annotations added
+            self.expt_table_preload = start_lamf_analysis()
+            # TODO: change default or allow options
 
     def load_experiments(self):
         if self.test_mode:
@@ -65,10 +71,10 @@ class ExperimentGroup():
             raise ValueError("No experiments to load (filter likely failed)")
 
         self.experiments = \
-            nu.load_ophys_expts(expt_list,
-                                multi=True,
-                                return_failed=False,
-                                dev=self.dev)
+            load_ophys_expts(expt_list,
+                             multi=True,
+                             return_failed=False,
+                             dev=self.dev)
         self._remove_extra_failed()
 
         self._get_ophys_cells_table()
