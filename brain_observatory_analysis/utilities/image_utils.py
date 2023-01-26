@@ -5,7 +5,7 @@ import imageio
 from pathlib import Path
 from typing import Union
 import mindscope_qc.data_access.from_lims as from_lims
-
+from tifffile import TiffWriter
 
 ########################################################################
 # Image outputs
@@ -74,6 +74,25 @@ def save_gif(image_stack: np.ndarray,
 
     # print message
     print(f"Saved gif to {gif_path} with {image_stack.shape[0]} frames")
+
+
+def save_tiff(images, filename):
+    """Save images as tiffs
+
+    Parameters
+    ----------
+    images : list of numpy.ndarray
+            List of images to save as tiffs
+    filename : str
+            Filename to save tiffs as
+    # TODO: make more robust
+    Returns
+    -------
+    None
+    """
+    with TiffWriter(filename) as tif:
+        for image in images:
+            tif.save(image)
 
 
 def get_motion_correction_crop_xy_range(oeid):

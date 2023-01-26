@@ -11,6 +11,8 @@ from allensdk.brain_observatory.behavior.behavior_ophys_experiment import Behavi
 # TODO: change to brain_observatory utilities
 from mindscope_utilities.visual_behavior_ophys.data_formatting import get_stimulus_response_df
 
+from .experiment_group import ExperimentGroup
+
 
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           event_type: str = "changes"):
