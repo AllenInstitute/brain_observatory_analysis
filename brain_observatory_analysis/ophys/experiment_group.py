@@ -14,7 +14,7 @@ class ExperimentGroup():
 
     Parameters
     ----------
-    expt_table_preload : pd.DataFrame, optional
+    expt_table_to_load : pd.DataFrame, optional
         table of experiments to load, by default None
     filters : dict, optional
         key value pairs to filter expt_table, by default {}
@@ -27,20 +27,20 @@ class ExperimentGroup():
     ----------
     dev : bool
 
-    expt_list_preload : list
+    expt_list_to_load : list
         list of experiments to load
     filters : dict
         key value pairs to filter expt_table
     """
 
     def __init__(self,
-                 expt_table_preload: pd.DataFrame = None,
+                 expt_table_to_load: pd.DataFrame = None,
                  filters: dict = {},
                  dev: bool = False,
                  test_mode: bool = False):
         self.dev = dev
-        self.expt_table_preload = expt_table_preload
-        self.expt_list_preload = self.expt_table_preload.index.tolist()
+        self.expt_table_to_load = expt_table_to_load
+        self.expt_list_to_load = self.expt_table_to_load.index.tolist()
         self.filters = filters
         self.test_mode = test_mode
         self.expt_list = []  # set after loading
@@ -55,15 +55,15 @@ class ExperimentGroup():
                             else v for k, v in self.filters.items()}
             self._filter_expt_table()
 
-        if self.expt_table_preload is None:
-            self.expt_table_preload = start_lamf_analysis()
+        if self.expt_table_to_load is None:
+            self.expt_table_to_load = start_lamf_analysis()
             # TODO: change default or allow options
 
     def load_experiments(self):
         if self.test_mode:
-            expt_list = self.expt_list_preload[:2]
+            expt_list = self.expt_list_to_load[:2]
         else:
-            expt_list = self.expt_list_preload
+            expt_list = self.expt_list_to_load
 
         # if expt_list empty throw error
         if not expt_list:
@@ -86,18 +86,18 @@ class ExperimentGroup():
         return list(self.experiments.values())[0]
 
     def _filter_expt_table(self):
-        """Filter expt_table_full by key value pairs in self.filters,
+        """Filter expt_table_to_load by key value pairs in self.filters,
         called when initilized
 
         TODO: consider making postload filter"""
 
         # make local so can filter on `ophys_experiment_id` index
-        local_expt_table = self.expt_table_preload.reset_index()
+        local_expt_table = self.expt_table_to_load.reset_index()
         table_cols = local_expt_table.columns
         assert all([x in table_cols for x in self.filters.keys()])
 
         # boolean index to filter experiment table by self.filters dict
-        filter_index = pd.Series([True] * len(self.expt_table_preload))
+        filter_index = pd.Series([True] * len(self.expt_table_to_load))
         for key, value in self.filters.items():
             print(key, value)
             filter_index = filter_index & local_expt_table[key].isin(
@@ -105,22 +105,22 @@ class ExperimentGroup():
 
         print(f"Found {sum(filter_index)} experiments matching filters")
 
-        self.expt_table_preload = (self.expt_table_preload[filter_index.values]
+        self.expt_table_to_load = (self.expt_table_to_load[filter_index.values]
                                    .sort_values(by="date_of_acquisition"))
-        self.expt_list_preload = self.expt_table_preload.index.tolist()
+        self.expt_list_to_load = self.expt_table_to_load.index.tolist()
 
     def _check_for_duplicates(self):
         """Check for duplicate experiments in expt_table_full"""
         # check for duplicates
-        if self.expt_table_preload.index.duplicated().any():
+        if self.expt_table_to_load.index.duplicated().any():
             print("Duplicate experiments in expt_table_full")
             print(
-                self.expt_table_preload[self.expt_table_preload.index.duplicated()])
+                self.expt_table_to_load[self.expt_table_to_load.index.duplicated()])
             raise ValueError
 
     def _expt_table_loaded(self):
         """Select only experiments that were loaded"""
-        return self.expt_table_preload.loc[self.experiments.keys()]
+        return self.expt_table_to_load.loc[self.experiments.keys()]
 
     def get_all_expts_session_type(self, session_type: list):
         # TODO THINK HOW TO BEST DO THIS
