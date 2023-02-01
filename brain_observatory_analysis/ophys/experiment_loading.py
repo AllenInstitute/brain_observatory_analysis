@@ -73,6 +73,14 @@ def start_lamf_analysis(verbose=False):
     return recent_expts
 
 
+def start_gh_analysis():
+    projects = ["VisualBehaviorMultiscope4areasx2d"]
+    expt_table = get_expts(projects=projects,
+                           pkl_workaround=False)
+    expt_table = etu.experiment_table_extended(expt_table)
+    return expt_table
+
+
 def start_vb_analysis():
     # TODO: fill in please :)
     expts = None
@@ -87,9 +95,44 @@ def apply_func_df_row(df, func, **kwargs):
     return df.apply(func, axis=1, **kwargs)
 
 
+def get_expts(projects: list = [],
+              pkl_workaround: bool = False,
+              verbose: bool = False,
+              passed_only: bool = True) -> pd.DataFrame:
+    experiments_table = get_expt_table(pkl_workaround=pkl_workaround, passed_only=passed_only)
+    if projects:
+        experiments_table = experiments_table.query(
+            "project_code in @projects").copy()
+
+    # pretty other cols
+    experiments_table['cre'] = (experiments_table['cre_line']
+                                .apply(lambda x: x.split('-')[0]))
+    # print useful info
+    if verbose:
+        print("Table Info \n----------")
+
+        print(f"Experiments: {experiments_table.shape[0]}")
+        print(experiments_table.experiment_workflow_state.unique())
+        print(experiments_table.project_code.unique())
+    return experiments_table
+
+
+def get_expt_table(pkl_workaround: bool = False,
+                   passed_only: bool = False):
+    if pkl_workaround:
+        print("Implementing pkl workaround hack will PIKA fixes LIMS/MTRAIN")
+        experiments_table = expt_table_fix.get_ophys_experiment_table()
+    else:
+        print("Should be on older version of allensdk branch, let MJD know if not")
+        cache = VisualBehaviorOphysProjectCache.from_lims()
+        experiments_table = cache.get_ophys_experiment_table(passed_only=passed_only)
+    return experiments_table
+
+
 def get_recent_expts(date_after: str = '2021-01-01',
                      projects: list = [],
                      pkl_workaround: bool = False,
+                     passed_only: bool = False,
                      verbose: bool = False) -> pd.DataFrame:
     """
     Returns a list of recent ophys experiments
@@ -104,13 +147,7 @@ def get_recent_expts(date_after: str = '2021-01-01',
     pd.DataFrame
         list of experiment (Format: Experiment_Table)
     """
-    if pkl_workaround:
-        print("Implementing pkl workaround hack will PIKA fixes LIMS/MTRAIN")
-        experiments_table = expt_table_fix.get_ophys_experiment_table()
-    else:
-        print("Should be on older version of allensdk branch, let MJD know if not")
-        cache = VisualBehaviorOphysProjectCache.from_lims()
-        experiments_table = cache.get_ophys_experiment_table(passed_only=False)
+    experiments_table = get_expt_table(pkl_workaround=pkl_workaround, passed_only=passed_only)
     # deep copy helped warning
     recent_experiments = experiments_table.loc[experiments_table.date_of_acquisition > date_after].copy(
     )
