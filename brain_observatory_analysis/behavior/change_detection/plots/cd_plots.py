@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ..licks import parse_lick_type
+from ..analysis.licks import parse_lick_type
 
 
 def get_reward_window(extended_trials: pd.DataFrame):
