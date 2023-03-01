@@ -37,6 +37,7 @@ class ExperimentGroup():
                  expt_table_to_load: pd.DataFrame = None,
                  filters: dict = {},
                  dev: bool = False,
+                 skip_eye_tracking: bool = False,
                  test_mode: bool = False):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
@@ -48,6 +49,7 @@ class ExperimentGroup():
         self.experiments = {}  # set after loading
         self.failed_to_load = []  # set after loading
         self.grp_ophys_cells_table = pd.DataFrame()
+        self.skip_eye_tracking = skip_eye_tracking
 
         if self.filters:
             # make sure each value in filters is a list
@@ -73,7 +75,8 @@ class ExperimentGroup():
             load_ophys_expts(expt_list,
                              multi=True,
                              return_failed=False,
-                             dev=self.dev)
+                             dev=self.dev,
+                             skip_eye_tracking=self.skip_eye_tracking)
         self._remove_extra_failed()
 
         self._get_ophys_cells_table()
