@@ -4,46 +4,69 @@ import warnings
 import pandas as pd
 from six import iteritems
 from dateutil import parser
-
 from .utils import inplace
 
-# TODO: UPDATE 2023 REFACTORING
-def annotate_licks(core_data, inplace=False, lick_bout_ili=0.7):
+
+####################################################################################################
+# Licks dataframe
+####################################################################################################
+
+def annotate_licks(dataObject=None,
+                   licks_df: pd.DataFrame = None,
+                   rewards_df: pd.DataFrame = None,
+                   inplace=False,
+                   lick_bout_ili=0.7):
+    '''Annotates licks dataframe with lick and lick bout information
+
+    Parameters
+    ----------
+    dataObject : BehaviorSession, BehaviorOphysSession object from SDK
+        OR ChangeDetectionDataset object from brain_observatory_analysis
+    licks_df : pd.DataFrame, optional
+        licks dataframe, by default None. Can supply instead of dataObject
+    rewards_df : pd.DataFrame
+        rewards dataframe, by default None. Can supply instead of dataObject
+    inplace : bool, optional
+        whether to operate in place, by default False
+    lick_bout_ili : float, optional
+        interval between licks required to label a lick as the start/end of a licking bout, by default 0.7
+
+    Returns
+    -------
+    pd.DataFrame
+        licks dataframe with additional columns
+
+
+    Notes
+    -----
+    Added columns:
+    pre_ili (float): time without any licks before current lick
+    post_ili (float): time without any licks after current lick
+    bout_start (boolean): True if licks is first in bout, False otherwise
+    bout_end (boolean): True if licks is last in bout, False otherwise
+    licks_in_bout (int): Number of licks in current lick bout
+    lick_bout_number (int): A count of the number of discrete lick bouts. All licks in a given bout share a value
+    bout_rewarded (bool): True if a reward was delivered within the current bout
+    hit (bool): True if the lick was a hit lick (lick that triggered a reward)
+
     '''
+    if dataObject is None:
+        assert licks_df is not None and rewards_df is not None, "Must supply either dataObject or licks_df and rewards_df"
 
-    annotates the licks dataframe with some additional columns
-
-    arguments:
-        dataset (BehaviorSession or BehaviorOphysSession object): an SDK session object
-        inplace (boolean): If True, operates in place (default = False)
-        lick_bout_ili (float): interval between licks required to label a lick as the start/end of a licking bout (default = 0.7)
-
-    returns (only if inplace=False):
-        pandas.DataFrame with columns:
-            timestamps (float): timestamp of every lick
-            frame (int): frame of every lick
-            pre_ili (float): time without any licks before current lick
-            post_ili (float): time without any licks after current lick
-            bout_start (boolean): True if licks is first in bout, False otherwise
-            bout_end (boolean): True if licks is last in bout, False otherwise
-            licks_in_bout (int): Number of licks in current lick bout
-            lick_bout_number (int): A count of the number of discrete lick bouts. All licks in a given bout share a value
-            bout_rewarded (bool): True if a reward was delivered within the current bout
-            hit (bool): True if the lick was a hit lick (lick that triggered a reward)
-    '''
-    licks_df = core_data["licks"]
-    rewards = core_data["rewards"]
-
+    # if dataObject is supplied, get licks_df and rewards_df from it
+    if dataObject is not None:
+        licks_df = dataObject.licks
+        rewards_df = dataObject.rewards
 
     licks_df['pre_ili'] = licks_df['time'] - licks_df['time'].shift(fill_value=0)
     licks_df['post_ili'] = licks_df['time'].shift(periods=-1, fill_value=np.inf) - licks_df['time']
     licks_df['bout_start'] = licks_df['pre_ili'] > lick_bout_ili
-    
+
     licks_df['bout_end'] = licks_df['post_ili'] > lick_bout_ili
 
     # 1st lick always start of bout (fix super early lick bug)
     # Still leaves open 0 frame licks, possible hardware bug 637762
-    licks_df.loc[0,"bout_start"] = True 
+    licks_df.loc[0, "bout_start"] = True 
 
     # count licks in every bout, add a lick bout number
     licks_df['licks_in_bout'] = np.nan
@@ -59,7 +82,9 @@ def annotate_licks(core_data, inplace=False, lick_bout_ili=0.7):
 
         bout_start_time = licks_df.loc[bout_start_index]['time']  # NOQA F841
         bout_end_time = licks_df.loc[bout_end_index]['time']  # NOQA F841
-        licks_df.at[bout_start_index, 'bout_rewarded'] = float(len(rewards.query('time >= @bout_start_time and time <= @bout_end_time')) >= 1)
+
+        query = 'time >= @bout_start_time and time <= @bout_end_time'
+        licks_df.at[bout_start_index, 'bout_rewarded'] = float(len(rewards_df.query(query)) >= 1)
 
     licks_df['licks_in_bout'] = licks_df['licks_in_bout'].fillna(method='ffill').astype(int)
     licks_df['lick_bout_number'] = licks_df['lick_bout_number'].fillna(method='ffill').astype(int)
@@ -69,17 +94,22 @@ def annotate_licks(core_data, inplace=False, lick_bout_ili=0.7):
     licks_df['hit'] = False
     licks_df.loc[licks_df.query('bout_rewarded').drop_duplicates(subset='lick_bout_number').index, 'hit'] = True
 
-    if inplace == False:
+    if inplace is False:
         return licks_df
 
 
-def _infer_last_trial_frame(trials, visual_stimuli):
-    """attempts to infer the last frame index of the trials
+####################################################################################################
+# Trials DataFrame
+####################################################################################################
+
+
+def _infer_last_trial_frame(trials_df, visual_stimuli):
+    """attempts to infer the last frame index of the trials_df
 
     Parameters
     ----------
-    trials : `pd.Dataframe`
-        core trials dataframe
+    trials_df : `pd.Dataframe`
+        core trials_df dataframe
     visual_stimuli : `pd.Dataframe`
         core visual stimuli dataframe
 
@@ -94,7 +124,7 @@ def _infer_last_trial_frame(trials, visual_stimuli):
     assumed that the last experiment frame would be a trial frame but breaks for
     experiments where the last frame is a movie frame or grayscreen
     """
-    last_trial_end_frame = (trials.iloc[-1]).endframe
+    last_trial_end_frame = (trials_df.iloc[-1]).endframe
     filtered_vs = visual_stimuli[visual_stimuli.frame >= last_trial_end_frame]
 
     if len(filtered_vs.index) > 0:
@@ -102,9 +132,9 @@ def _infer_last_trial_frame(trials, visual_stimuli):
 
 
 @inplace
-def make_trials_contiguous(trials, time, visual_stimuli=None):
+def make_trials_contiguous(trials_df, time, visual_stimuli=None):
     if visual_stimuli is not None:
-        trial_end_frame = _infer_last_trial_frame(trials, visual_stimuli, )
+        trial_end_frame = _infer_last_trial_frame(trials_df, visual_stimuli, )
     else:
         trial_end_frame = None
 
@@ -115,33 +145,33 @@ def make_trials_contiguous(trials, time, visual_stimuli=None):
 
     trial_end_time = time[trial_end_frame]
 
-    trials['endframe'] = trials['startframe'] \
+    trials_df['endframe'] = trials_df['startframe'] \
         .shift(-1) \
         .fillna(trial_end_frame) \
         .astype(int)
-    trials['endtime'] = trials['starttime'] \
+    trials_df['endtime'] = trials_df['starttime'] \
         .shift(-1) \
         .fillna(trial_end_time)
-    trials['trial_length'] = trials['endtime'] - trials['starttime']
+    trials_df['trial_length'] = trials_df['endtime'] - trials_df['starttime']
 
 
 @inplace
-def annotate_parameters(trials, metadata, keydict=None):
+def annotate_parameters(trials_df, metadata, keydict=None):
     """ annotates a dataframe with session parameters
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials (or flashes)
+    trials_df : pandas DataFrame
+        dataframe of trials_df (or flashes)
     data : unpickled session
     keydict : dict
         {'column': 'parameter'}
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
-    io.load_trials
+    io.load_trials_df
     io.load_flashes
     """
     if keydict is None:
@@ -149,9 +179,9 @@ def annotate_parameters(trials, metadata, keydict=None):
     else:
         for key, value in iteritems(keydict):
             try:
-                trials[key] = [metadata[value]] * len(trials)
+                trials_df[key] = [metadata[value]] * len(trials_df)
             except KeyError:
-                trials[key] = None
+                trials_df[key] = None
 
 
 @inplace
@@ -160,14 +190,14 @@ def explode_startdatetime(df):
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials (or flashes)
+    trials_df : pandas DataFrame
+        dataframe of trials_df (or flashes)
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
-    io.load_trials
+    io.load_trials_df
     """
     df['date'] = df['startdatetime'].dt.date
     df['year'] = df['startdatetime'].dt.year
@@ -183,10 +213,10 @@ def annotate_n_rewards(df):
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
@@ -199,86 +229,86 @@ def annotate_n_rewards(df):
 
 
 # @inplace
-# def annotate_rig_id(trials, metadata):
+# def annotate_rig_id(trials_df, metadata):
 #     """ adds a column with rig id
 
 #     Parameters
 #     ----------
-#     trials : pandas DataFrame
-#         dataframe of trials
+#     trials_df : pandas DataFrame
+#         dataframe of trials_df
 #     inplace : bool, optional
-#         modify `trials` in place. if False, returns a copy. default: True
+#         modify `trials_df` in place. if False, returns a copy. default: True
 
 #     See Also
 #     --------
 #     io.load_trials
 #     """
 #     try:
-#         trials['rig_id'] = metadata['rig_id']
+#         trials_df['rig_id'] = metadata['rig_id']
 #     except KeyError:
 #         from visual_behavior.devices import get_rig_id
-#         trials['rig_id'] = get_rig_id(trials['computer_name'][0])
+#         trials_df['rig_id'] = get_rig_id(trials_df['computer_name'][0])
 
 
 @inplace
-def annotate_startdatetime(trials, metadata):
+def annotate_startdatetime(trials_df, metadata):
     """ adds a column with the session's `startdatetime`
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     data : pickled session
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
     io.load_trials
     """
-    trials['startdatetime'] = parser.parse(metadata['startdatetime'])
+    trials_df['startdatetime'] = parser.parse(metadata['startdatetime'])
 
 
 @inplace
-def assign_session_id(trials):
+def assign_session_id(trials_df):
     """ adds a column with a unique ID for the session defined as
             a combination of the mouse ID and startdatetime
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
     io.load_trials
     """
-    trials['session_id'] = trials['mouse_id'] + '_' + trials['startdatetime'].map(lambda x: x.isoformat())
+    trials_df['session_id'] = trials_df['mouse_id'] + '_' + trials_df['startdatetime'].map(lambda x: x.isoformat())
 
 
 @inplace
-def annotate_cumulative_reward(trials, metadata):
+def annotate_cumulative_reward(trials_df, metadata):
     """ adds a column with the session's cumulative volume
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     data : pickled session
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
-    io.load_trials
+    io.load_trials_df
     """
     try:
-        trials['cumulative_volume'] = trials['reward_volume'].cumsum()
+        trials_df['cumulative_volume'] = trials_df['reward_volume'].cumsum()
     except Exception:
-        trials['reward_volume'] = metadata['rewardvol'] * trials['number_of_rewards']
-        trials['cumulative_volume'] = trials['reward_volume'].cumsum()
+        trials_df['reward_volume'] = metadata['rewardvol'] * trials_df['number_of_rewards']
+        trials_df['cumulative_volume'] = trials_df['reward_volume'].cumsum()
 
 
 @inplace
@@ -287,30 +317,30 @@ def annotate_filename(df, filename):
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     filename : full filename & path of session's pickle file
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
-    io.load_trials
+    io.load_trials_df
     """
     df['filepath'] = os.path.split(filename)[0]
     df['filename'] = os.path.split(filename)[-1]
 
 
 @inplace
-def fix_autorearded(df):
+def fix_autorewarded(df):
     """ renames `auto_rearded` columns to `auto_rewarded`
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
@@ -320,23 +350,23 @@ def fix_autorearded(df):
 
 
 @inplace
-def annotate_change_detect(trials):
+def annotate_change_detect(trials_df):
     """ adds `change` and `detect` columns to dataframe
 
     Parameters
     ----------
-    trials : pandas DataFrame
-        dataframe of trials
+    trials_df : pandas DataFrame
+        dataframe of trials_df
     inplace : bool, optional
-        modify `trials` in place. if False, returns a copy. default: True
+        modify `trials_df` in place. if False, returns a copy. default: True
 
     See Also
     --------
-    io.load_trials
+    io.load_trials_df
     """
 
-    trials['change'] = trials['trial_type'] == 'go'
-    trials['detect'] = trials['response'] == 1.0
+    trials_df['change'] = trials_df['trial_type'] == 'go'
+    trials_df['detect'] = trials_df['response'] == 1.0
 
 
 @inplace
@@ -838,3 +868,32 @@ def remove_repeated_licks(trials):
     trials['lick_times'] = lt
     trials['lick_frames'] = lf
 
+
+@inplace
+def near_miss(trials_df: pd.DataFrame, near_miss_window: float = 0.5):
+    """Add a column to the trials dataframe indicating whether a near
+    miss occurred, within certain time window after the end
+    of the response/reward window
+    
+    Parameters
+    ----------
+    trials_df : pd.DataFrame
+        trials dataframe
+    near_miss_window : float, optional
+        time window after the end of the response/reward window, by default 0.5 seconds
+
+    Returns
+    -------
+    None
+
+    """
+    trials_df['near_miss'] = np.nan
+    for idx, row in trials_df.iterrows():
+        if row['trial_type'] == 'go':
+            if row['response_latency'] > row['response_window'][1] and \
+                    row['response_latency'] < row['response_window'][1] + near_miss_window:
+                trials_df.loc[idx, 'near_miss'] = True
+            else:
+                trials_df.loc[idx, 'near_miss'] = False
+        else:
+            trials_df.loc[idx, 'near_miss'] = False

@@ -29,6 +29,8 @@ class ChangeDetectionDataset(object):
         self.raw_data = None
         self.core_data = None
         self.extended_trials_df = None
+        self.licks = None  # refers to core_data["licks"]
+        self.rewards = None  # refers to core_data["rewards"]
 
         if data_file:
             self.data_file = data_file
@@ -47,9 +49,13 @@ class ChangeDetectionDataset(object):
             self.core_data = utils.catch_trials_pkl_hack(self.raw_data)
         self.core_data = pkl_translator.data_to_change_detection_core(self.raw_data)
 
+        # set core_data["rewards"] to be a class attribute
+        self.rewards = self.core_data["rewards"]
+        self.licks = self.core_data["licks"]  
+
 
     def _annotate_licks(self):
-        self.core_data["licks"] = annotate.annotate_licks(self.core_data)
+        self.core_data["licks"] = annotate.annotate_licks(self)
 
 
     def _create_extended_dataframe(self):
@@ -63,6 +69,12 @@ class ChangeDetectionDataset(object):
     # get core data
     def get_core_data(self):
         return self.core_data
+    
+    def get_reward_df(self):
+        return self.core_data['rewards']
+    
+    def get_lick_df(self):
+        return self.core_data['licks']
 
     # get raw data
     def get_raw_data(self):

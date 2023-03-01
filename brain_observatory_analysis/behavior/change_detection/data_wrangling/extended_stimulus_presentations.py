@@ -7,12 +7,23 @@ from functools import partial
 logger = logging.getLogger(__name__)
 
 
-def get_extended_stimulus_presentations_df(stimulus_presentations_df: pd.DataFrame, 
-                                           licks: pd.DataFrame,
-                                           rewards: pd.DataFrame, 
-                                           running_speed: pd.DataFrame, 
-                                           eye_tracking: bool = None, 
-                                           behavior_session_id: int = None):
+def stimulus_presentations_sdk_keys(esp):
+
+    keys = ['duration', 'end_frame', 'image_index', 'image_name', 'image_set',
+            'is_change', 'omitted', 'start_frame', 'start_time', 'stop_time']
+
+    # check all keys are present in esp, and no others
+    assert set(keys) == set(esp.keys()), "esp keys don't match expected keys"
+
+    return keys
+
+
+# TODO: USE ANNOTATE LICKS 
+def get_extended_stimulus_presentations(stimulus_presentations_df: pd.DataFrame, 
+                                        licks: pd.DataFrame,
+                                        rewards: pd.DataFrame,
+                                        running_speed: pd.DataFrame,
+                                        eye_tracking: bool = None):
     """
     Takes SDK stimulus presentations table and adds a bunch of useful columns by incorporating data from other tables
     and reformatting existing column data
@@ -22,12 +33,58 @@ def get_extended_stimulus_presentations_df(stimulus_presentations_df: pd.DataFra
 
     Set eye_tracking to None by default so that things still run for behavior only sessions
     If behavior_session_id is provided, will load metrics from behavior model outputs file
+
+
+
+    Table Notes
+    -----------
+    This function returns a table with all the INPUT columns, plus the following OUTPUT columns.
+
+    
+    INPUT: stimulus_presentations_df (from SDK object) columns:
+    + duration
+    + end_frame
+    + image_index
+    + image_name
+    + image_set
+    + is_change
+    + omitted
+    + start_frame
+    + start_time
+    + stop_time
+
+    OUTPUT: extended_stimulus_presentations_df:
+    + change
+    + pre_change
+    + pre_omitted
+    + mean_running_speed
+    + mean_pupil_area
+    + licks
+    + response_latency
+    + reponse_binary
+    + early_lick
+    + licked
+    + lick_rate
+    + rewarded
+    + reward_rate_per_second
+    + reward_rate
+    + engagment_1
+    + engagment_1_string
+    + egagement_2
+    + engagment_2_string
+    + time_from_last_lick
+    + time_from_last_reward
+    + time_from_last_change
+    + time_from_last_aborted
+
     """
     spdf = stimulus_presentations_df
 
     if 'time' in licks.keys():
         licks = licks.rename(columns={'time': 'timestamps'})
 
+    # extra columns in gratings sessions
+    # Grating info is maintained in "image_name" column (e.g. gratings_90.0)
     if 'orientation' in spdf.columns:
         spdf = spdf.drop(columns=['orientation', 'image_set',
                                   'phase', 'spatial_frequency'])
@@ -35,50 +92,48 @@ def get_extended_stimulus_presentations_df(stimulus_presentations_df: pd.DataFra
     spdf = add_change_each_flash(spdf)
     spdf['pre_change'] = spdf['change'].shift(-1)
     spdf['pre_omitted'] = spdf['omitted'].shift(-1)
-
-    # spdf = add_epoch_times(spdf) # MJD EDIT
-
+    spdf = add_epoch_times(spdf) # MJD EDIT
     spdf = add_mean_running_speed(spdf, running_speed)
 
-    if eye_tracking is not None:
-        try:  # if eye tracking data is not present or cant be loaded
-            spdf = add_mean_pupil_area(spdf, eye_tracking)
-        except BaseException:  # set to NaN
-            spdf['mean_pupil_area'] = np.nan
-
-    spdf = add_licks_each_flash(spdf, licks)
-    spdf = add_response_latency(spdf)
-    spdf = add_rewards_each_flash(spdf, rewards)
+    # LICKS
     spdf['licked'] = [True if len(licks) > 0 else False for licks in
                       spdf.licks.values]
-    # lick rate per second
+    
     spdf['lick_rate'] = spdf['licked'].rolling(window=320, min_periods=1,
                                                win_type='triang').mean() / .75
+    spdf = add_response_latency(spdf)
+    spdf = add_licks_each_flash(spdf, licks)
 
+    # REWARDS
     spdf['rewarded'] = [True if len(rewards) > 0 else False for rewards in spdf.rewards.values]
 
     # (rewards/stimulus)*(1 stimulus/.750s) = rewards/second
-    spdf['reward_rate_per_second'] = spdf['rewarded'].rolling(window=320, min_periods=1,
-                                                              win_type='triang').mean() / .75  # units of rewards per second
+    spdf['reward_rate_per_second'] = \
+        spdf['rewarded'].rolling(window=320, min_periods=1,
+                                 win_type='triang').mean() / .75  # units of rewards/second
+
     # (rewards/stimulus)*(1 stimulus/.750s)*(60s/min) = rewards/min
-    spdf['reward_rate'] = spdf['rewarded'].rolling(window=320, min_periods=1, 
-                                                   win_type='triang').mean() * (60 / .75)  # units of rewards/min
+    spdf['reward_rate'] = \
+        spdf['rewarded'].rolling(window=320, min_periods=1, 
+                                 win_type='triang').mean() * (60 / .75)  # units of rewards/min
+    
+    spdf = add_rewards_each_flash(spdf, rewards)
 
-    reward_threshold = 2 / 3  # 2/3 rewards per minute = 1/90 rewards/second
-    spdf['engaged'] = [x > reward_threshold for x in spdf['reward_rate']]
-    spdf['engagement_state'] = ['engaged' if True else 'disengaged' for engaged in spdf['engaged'].values]
-
+    spdf = add_engagment_state_1(spdf, reward_threshold=2 / 3)
+    spdf = add_engagment_state_2(spdf)
     spdf = add_response_latency(spdf)
-    # spdf = reformat.add_image_contrast_to_stimulus_presentations(spdf)
     spdf = add_time_from_last_lick(spdf, licks)
     spdf = add_time_from_last_reward(spdf, rewards)
     spdf = add_time_from_last_change(spdf)
-    try:  # behavior only sessions dont have omissions
+
+    # behavior only sessions dont have omissions
+    try:  
         spdf = add_time_from_last_omission(spdf)
         spdf['flash_after_omitted'] = spdf['omitted'].shift(1)
     except BaseException:
         pass
-
+    
+    # Possible annotations to add:
     # spdf['flash_after_change'] = spdf['change'].shift(1)
     # spdf['image_name_next_flash'] = spdf['image_name'].shift(-1)
     # spdf['image_index_next_flash'] = spdf['image_index'].shift(-1)
@@ -88,18 +143,62 @@ def get_extended_stimulus_presentations_df(stimulus_presentations_df: pd.DataFra
     # spdf['lick_rate_next_flash'] = spdf['lick_rate'].shift(-1)
     # spdf['lick_on_previous_flash'] = spdf['licked'].shift(1)
     # spdf['lick_rate_previous_flash'] = spdf['lick_rate'].shift(1)
-    # if behavior_session_id:
-    #     if check_if_model_output_available(behavior_session_id):
-    #         spdf = add_model_outputs_to_stimulus_presentations(
-    #             spdf, behavior_session_id)
-    #     else:
-    #         print('model outputs not available')
+
+    # spdf = reformat.add_image_contrast_to_stimulus_presentations(spdf)
+
     return spdf
 
 
 ####################################################################################################
 # REFORMAT/ANNOTATIONS: Functions to add columns to stimulus_presentations_df
 ####################################################################################################
+
+def add_engagment_state_1(spdf: pd.DataFrame,
+                          reward_threshold: float = 2 / 3):
+    '''
+    Add engagment state column to spdf
+
+    Parameters
+    ----------
+    spdf : pd.DataFrame
+        stimulus_presentations_df
+    reward_threshold : float
+        threshold for reward rate to be considered engaged
+        2/3 rewards per minute = 1/90 rewards/second
+
+    Returns
+    -------
+    spdf : pd.DataFrame
+        stimulus_presentations_df with ['engaged_1'] and ['engaged_1_string'] column added
+
+    '''
+
+    spdf['engaged_1'] = [x > reward_threshold for x in spdf['reward_rate']]
+    spdf['engaged_1_string'] = ['engaged_1' if True else 'disengaged' for engaged in spdf['engaged_1'].values]
+
+    return spdf
+
+
+def add_engagment_state_2(spdf: pd.DataFrame):
+    '''
+    Add engagment state column to spdf
+
+    Parameters
+    ----------
+    spdf : pd.DataFrame
+        stimulus_presentations_df
+    reward_threshold : float
+        threshold for reward rate to be considered engaged
+    Returns
+    -------
+    spdf : pd.DataFrame
+    
+
+    '''
+    # TODO: implement another engagment state
+
+    return spdf
+
 
 # TODO: maybe general tool
 def convert_running_speed(running_speed_obj):
@@ -331,7 +430,7 @@ def add_epoch_times(df, time_column='start_time', epoch_duration_mins=10):
             indices = df[(df[time_column] >= epoch_times[i]) & (df[time_column] < epoch_times[i + 1])].index.values
         else:
             indices = df[(df[time_column] >= epoch_times[i])].index.values
-        df.at[indices, 'epoch'] = i
+        df.loc[indices, 'epoch'] = i
     return df
 
 

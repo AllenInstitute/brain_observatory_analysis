@@ -59,9 +59,11 @@ def create_extended_dataframe(core_data: dict,
     annotate.explode_startdatetime(trials, inplace=True)
     annotate.annotate_n_rewards(trials, inplace=True)
     #annotate.annotate_rig_id(trials, metadata, inplace=True) # MJD 2023
-    annotate.fix_autorearded(trials, inplace=True)
+    annotate.fix_autorewarded(trials, inplace=True)
     annotate.annotate_cumulative_reward(trials, metadata, inplace=True)
     # annotate.annotate_filename(trials, filename, inplace=True)
+
+    
 
     for col in ('auto_rewarded', 'change_time', ):
         if col not in trials.columns:
@@ -77,8 +79,7 @@ def create_extended_dataframe(core_data: dict,
 
     annotate.update_times(trials, time, inplace=True)
 
-    # bouts MJD (must be after update_times, where lick_times are corrected)
-    trials["lick_bout_times"] = annotate.get_lick_bout_times(trials, licks)
+    
 
     annotate.annotate_lick_vigor(trials, licks, inplace=True)
     annotate.calculate_latency(trials, inplace=True)
@@ -87,6 +88,12 @@ def create_extended_dataframe(core_data: dict,
     trials['response'] = annotate.check_responses(trials)
     trials['color'] = trials.apply(annotate.assign_color, axis=1)
     trials['response_type'] = annotate.get_response_type(trials)
+
+    #2023 new cols
+    annotate.near_miss(trials, inplace=True)
+
+    # bouts MJD (must be after update_times, where lick_times are corrected)
+    trials["lick_bout_times"] = annotate.get_lick_bout_times(trials, licks)
 
     try:
         annotate.remove_repeated_licks(trials, inplace=True)
