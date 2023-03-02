@@ -1,2 +1,3 @@
 # brain_observatory_analysis
-TODO
+
+BOA: squeezing insights out of your neuroscience data so you don't have to!
