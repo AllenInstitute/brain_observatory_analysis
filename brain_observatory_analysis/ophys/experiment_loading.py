@@ -85,9 +85,11 @@ def start_gh_analysis():
 
 
 def start_vb_analysis():
-    # TODO: fill in please :)
-    expts = None
-    return expts
+    projects = ['VisualBehaviorMultiscope', 'VisualBehavior', 'VisualBehaviorTask1B']
+    expt_table = get_expts(projects=projects,
+                           pkl_workaround=False)
+    expt_table = etu.experiment_table_extended(expt_table)
+    return expt_table
 
 
 def apply_func_df(df, func):
