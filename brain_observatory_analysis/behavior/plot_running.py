@@ -3,10 +3,26 @@ from matplotlib import pyplot as plt
 
 
 # A function to plot running speed during gray periods
-def plot_running_speed_gray_periods(session_name, lamf_group, gray_period=5 * 60):
+def plot_running_speed_gray_periods(expt_group, session_name, gray_period=5 * 60):
+    """Plot running speed during gray periods.
+    
+    Parameters
+    ----------
+    expt_group : ExperimentGroup
+        ExperimentGroup object.
+    ession_name : str
+        Name of the session, as in the Experiment Object
+    gray_period : int, optional
+        Length of gray period in seconds, by default 5 * 60
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Figure object.
+    """
     # Plot running speed during gray periods
-    oeids = lamf_group.expt_table.query('session_name==@session_name').index.values
-    exp = lamf_group.experiments[oeids[0]]
+    oeids = expt_group.expt_table.query('session_name==@session_name').index.values
+    exp = expt_group.experiments[oeids[0]]  # Use the first experiment for the session (running is session-specific, same across experiments)
     
     timepoints = exp.running_speed.timestamps.values
     speed = exp.running_speed.speed.values
