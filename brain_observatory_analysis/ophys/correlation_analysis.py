@@ -119,6 +119,7 @@ def _append_results(results, trace_df, epoch):
     results['xy_label_pos'].append(xy_label_pos)
     results['xy_labels'].append(xy_labels)
     results['sorted_inds'].append(sorted_ind)
+    results['remove_inds'].append(remove_ind)
     return results
 
 
@@ -157,6 +158,8 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
         List of x and y labels for corr_ordered_by_region_matrices
     sorted_inds_list: list
         List of sorted indices for corr_ordered_by_region_matrices
+    remove_inds_list: list
+        List of indices removed because of NaN frames
     """
 
     results = {'epochs': [],
@@ -166,7 +169,8 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
                'corr_ordered_by_region_matrices': [],
                'xy_label_pos': [],
                'xy_labels': [],
-               'sorted_inds': []}
+               'sorted_inds': [],
+               'remove_inds': []}
 
     trace_task_df = df.get_trace_df_task(lamf_group, session_name)
     results = _append_results(results, trace_task_df, 'task')
@@ -196,14 +200,15 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
             results = _append_results(results, trace_event_df, event)
     
     epochs, trace_dfs, corr_matrices, corr_ordered_matrices, corr_ordered_by_region_matrices, \
-        xy_label_pos_list, xy_labels_list, sorted_inds_list = results.values()
+        xy_label_pos_list, xy_labels_list, sorted_inds_list, remove_inds_list = results.values()
 
     return epochs, trace_dfs, corr_matrices, corr_ordered_matrices, corr_ordered_by_region_matrices, \
-        xy_label_pos_list, xy_labels_list, sorted_inds_list
+        xy_label_pos_list, xy_labels_list, sorted_inds_list, remove_inds_list
 
 
 def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ordered_matrices, corr_ordered_by_region_matrices,
-                                 xy_label_pos_list, xy_labels_list, sorted_inds_list, session_name, vmin=-0.4, vmax=0.8, cb_shrink_factor=0.7):
+                                 xy_label_pos_list, xy_labels_list, sorted_inds_list, remove_inds_list, session_name,
+                                 vmin=-0.4, vmax=0.8, cb_shrink_factor=0.7):
     """Compare correlation matrices
     Plot correlation matrices for different epochs and events
     along with their sorted correlation matrices by one correlation matrix (Reference matrix)
@@ -240,11 +245,27 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
     inds = []
     for i in range(num_rows):
         inds.append(epochs.index(compare_epochs[i]))
-    
-    ref_sort_ind = sorted_inds_list[inds[0]]
-    comp_sorted_by_ref = []
+
+    # Set remove_inds as the union of remove_inds_list
+    remove_inds = remove_inds_list[inds[0]]
     for i in range(1, num_rows):
-        comp_sorted_by_ref.append(corr_matrices[inds[i]][ref_sort_ind, :][:, ref_sort_ind])
+        remove_inds = np.union1d(remove_inds, remove_inds_list[inds[i]])
+    # Only show the cell indice that are not removed in any of the compared matrices
+    ref_sort_ind = [si for si in sorted_inds_list[inds[0]] if si not in remove_inds]
+    comp_sorted_by_ref = []
+    num_indice = []
+    for i in range(1, num_rows):
+        # For each compared matrix, reduce the cell indice by the number of removed cells
+        # Because each matrix has different number of removed cells
+        # However, the resulting compared matrices will all have the same number of cells
+        temp_sort_ind = ref_sort_ind.copy()
+        for j in range(len(temp_sort_ind)):
+            reduction = np.where(remove_inds_list[inds[i]] < temp_sort_ind[j])[0].shape[0]
+            temp_sort_ind[j] -= reduction
+        assert len(temp_sort_ind) == len(np.unique(temp_sort_ind))
+        num_indice.append(len(temp_sort_ind))
+        comp_sorted_by_ref.append(corr_matrices[inds[i]][temp_sort_ind, :][:, temp_sort_ind])
+    assert len(np.unique(num_indice)) == 1
     fig, ax = plt.subplots(num_rows, 3, figsize=(15, num_rows * 5))
     # Plot reference matrices
     sns.heatmap(corr_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor},

@@ -7,6 +7,17 @@ from brain_observatory_analysis.ophys import data_formatting as df
 from brain_observatory_analysis.utilities import data_utils as du
 
 
+def _get_pupil_diameter(exp):
+    eye_timestamps = exp.eye_tracking.timestamps.values
+    if 'pupil_diameter' in exp.eye_tracking.columns:
+        pupil_diameter = exp.eye_tracking.pupil_diameter.values
+    elif 'pupil_area' in exp.eye_tracking.columns:
+        pupil_diameter = np.sqrt(exp.eye_tracking.pupil_area.values / np.pi)
+    else:
+        pupil_diameter = None
+    return pupil_diameter, eye_timestamps
+
+
 def plot_task_raster_with_behav_sort_by_corr(
         lamf_group, session_name, remove_auto_rewarded=True,
         lick_template_rate=100, lick_rate_window=1, sub_title_fontsize=10,
@@ -55,14 +66,14 @@ def plot_task_raster_with_behav_sort_by_corr(
         rax.set_title('Running speed (cm/s)', loc='left', fontsize=sub_title_fontsize, color='C3')
 
         # Add pupil diameter by interpolating to the timepoints
-        eye_timestamps = exp.eye_tracking.timestamps.values
-        pupil_diameter = exp.eye_tracking.pupil_diameter.values
-        pupil_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
-        pax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
-        pax.plot(pupil_interp, color='black')
-        pax.set_xlim(0, len(task_trace_all_mean))
-        pax.set_xticks([])
-        pax.set_title('Pupil diameter (AU)', loc='left', fontsize=sub_title_fontsize, color='black')
+        pupil_diameter, eye_timestamps = _get_pupil_diameter(exp)
+        if pupil_diameter is not None:
+            pupil_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
+            pax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
+            pax.plot(pupil_interp, color='black')
+            pax.set_xlim(0, len(task_trace_all_mean))
+            pax.set_xticks([])
+            pax.set_title('Pupil diameter (AU)', loc='left', fontsize=sub_title_fontsize, color='black')
 
         # # Add licks to the nearest timepoints
         # licktimes = exp.licks.timestamps.values
@@ -200,15 +211,14 @@ def plot_notask_raster_with_behav_sort_by_corr(
             rax.set_title('Running speed (cm/s)', loc='left', fontsize=sub_title_fontsize, color='C3')
 
             # Add pupil diameter by interpolating to the timepoints
-            eye_timestamps = exp.eye_tracking.timestamps.values
-            pupil_diameter = exp.eye_tracking.pupil_diameter.values
-            pupil_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
-            pax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
-            pax.plot(pupil_interp, color='black')
-            pax.set_xlim(0, len(trace_all_mean))
-            pax.set_xticks([])
-            pax.set_title('Pupil diameter (AU)', loc='left', fontsize=sub_title_fontsize, color='black')
-
+            pupil_diameter, eye_timestamps = _get_pupil_diameter(exp)
+            if pupil_diameter is not None:
+                pupil_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
+                pax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
+                pax.plot(pupil_interp, color='black')
+                pax.set_xlim(0, len(trace_all_mean))
+                pax.set_xticks([])
+                pax.set_title('Pupil diameter (AU)', loc='left', fontsize=sub_title_fontsize, color='black')
             # # Add licks to the nearest timepoints
             # licktimes = exp.licks.timestamps.values
             # stim_df = data_formatting.annotate_stimuli(exp) # First experiment represents the session stimulus presentations
