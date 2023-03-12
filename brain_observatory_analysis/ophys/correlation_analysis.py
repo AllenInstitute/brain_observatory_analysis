@@ -44,7 +44,7 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
     num_nan_frames = len(nan_frames)
 
-    remove_ind = None
+    remove_ind = np.zeros(0,)
     if num_nan_frames > num_nan_frames_threshold:
         num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
         ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
@@ -266,6 +266,7 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
         num_indice.append(len(temp_sort_ind))
         comp_sorted_by_ref.append(corr_matrices[inds[i]][temp_sort_ind, :][:, temp_sort_ind])
     assert len(np.unique(num_indice)) == 1
+
     fig, ax = plt.subplots(num_rows, 3, figsize=(15, num_rows * 5))
     # Plot reference matrices
     sns.heatmap(corr_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor},
