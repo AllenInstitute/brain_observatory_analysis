@@ -7,7 +7,63 @@ from mindscope_utilities.visual_behavior_ophys import data_formatting
 # TODO: Make them work with events as well.
 # Need to consider timepoint alignment between events.
 # Functions to get trace_df and calculate correlations
-def get_trace_df_all(expt_group, session_name, trace_type='dff'):
+
+def _default_column_names():
+    """ Return default column names for trace_df
+    Returns
+    -------
+    column_names : list
+        list of column names
+    """
+    column_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid', 'targeted_structure', 'depth_order', 'bisect_layer']
+    return column_names
+
+
+def _default_column_base_names():
+    """ Return default column base names for trace_df
+    Returns
+    -------
+    column_base_names : list
+        list of column base names
+    """
+    column_base_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid']
+    return column_base_names
+
+
+def _set_column_names(expt_group, column_names, column_base_names):
+    """ Set column names for trace_df
+    From the column_names, remove the ones that are not in expt_group.expt_table.columns.values
+    Add the ones that are in column_base_names but not in column_names
+    Also return the column names that are NOT in column_base_names as column_added_names
+
+    Parameters
+    ----------
+    expt_group : ExperimentGroup
+        ExperimentGroup object
+    column_names : list
+        list of column names
+    column_base_names : list
+        list of column base names
+
+    Returns
+    -------
+    column_names : list
+        list of column names
+    column_added_names : list
+        list of column names added
+    """
+    expt_column_names = expt_group.expt_table.columns.values
+    for cn in column_names:
+        if cn not in expt_column_names:
+            column_names.remove(cn)
+    for cbn in column_base_names:
+        if cbn not in column_names:
+            column_names = [cbn] + column_names
+    column_added_names = [cn for cn in column_names if cn not in column_base_names]
+    return column_names, column_added_names
+
+
+def get_trace_df_all(expt_group, session_name, trace_type='dff', column_names=None):
     """Get a dataframe of all traces from a session (all ophys trace, either dff or events)
 
     Parameters
@@ -26,10 +82,14 @@ def get_trace_df_all(expt_group, session_name, trace_type='dff'):
     
     """
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name==session_name].index.values)
+    if column_names is None:
+        column_names = _default_column_names()
+    column_base_names = _default_column_base_names()
+    column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
     # load all the traces from this session
-    trace_df = pd.DataFrame(columns=['cell_specimen_id', 'trace', 'timepoints', 'oeid', 'target_region', 'depth_order', 'bisect_layer']).set_index('cell_specimen_id')
+    trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
-        temp_df = pd.DataFrame(columns=['cell_specimen_id', 'trace', 'timepoints', 'oeid', 'target_region', 'depth_order', 'bisect_layer'])
+        temp_df = pd.DataFrame(columns=column_names)
         if trace_type == 'dff':
             trace_df = expt_group.experiments[oeid].dff_traces
             trace = trace_df.dff.values
@@ -43,9 +103,8 @@ def get_trace_df_all(expt_group, session_name, trace_type='dff'):
         temp_df['trace'] = trace
         temp_df['timepoints'] = expt_group.experiments[oeid].ophys_timestamps
         temp_df['oeid'] = oeid
-        temp_df['target_region'] = expt_group.expt_table.loc[oeid].targeted_structure
-        temp_df['depth_order'] = expt_group.expt_table.loc[oeid].depth_order
-        temp_df['bisect_layer'] = expt_group.expt_table.loc[oeid].bisect_layer
+        for cn in column_added_names:
+            temp_df[cn] = expt_group.expt_table.loc[oeid, cn]
         temp_df.set_index('cell_specimen_id', inplace=True)
         temp_df.sort_index(inplace=True)
         trace_df = pd.concat([trace_df, temp_df])
@@ -126,17 +185,9 @@ def get_trace_df_no_task(expt_group, session_name, trace_type='dff', column_name
 
     # Set the column names
     if column_names is None:
-        column_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid', 'target_region', 'depth_order', 'bisect_layer']
-    # from the expt_table, check the column names and remove the ones that are not in the experiment table
-    expt_column_names = expt_group.expt_table.columns.values
-    for cn in column_names:
-        if cn not in expt_column_names:
-            column_names.remove(cn)
-    column_base_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid']  # These are the columns that are always in the dataframe
-    for cbn in column_base_names:
-        if cbn not in column_names:
-            column_names = [cbn] + column_names
-    column_added_names = [cn for cn in column_names if cn not in column_base_names]
+        column_names = _default_column_names()
+    column_base_names = _default_column_base_names()
+    column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
     
     # Initialize
     trace_df_gray_pre_task = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
@@ -153,7 +204,7 @@ def get_trace_df_no_task(expt_group, session_name, trace_type='dff', column_name
         else:
             raise ValueError('trace_type must be dff or events')
         timestamps = expt_group.experiments[oeid].ophys_timestamps
-        # cell_specimen_id, oeid, target_region, depth_order, bisect_layer are the same
+        # cell_specimen_id, oeid, targeted_structure, depth_order, bisect_layer are the same
         # across epochs in no-task window
         # Only switch trace and timepoints for each epoch
         csid = trace_df.index.values
@@ -291,18 +342,10 @@ def get_trace_df_task(expt_group, session_name, remove_auto_rewarded=True, colum
 
     # Set the column names
     if column_names is None:
-        column_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid', 'target_region', 'depth_order', 'bisect_layer']
-    # from the expt_table, check the column names and remove the ones that are not in the experiment table
-    expt_column_names = expt_group.expt_table.columns.values
-    for cn in column_names:
-        if cn not in expt_column_names:
-            column_names.remove(cn)
-    column_base_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid']  # These are the columns that are always in the dataframe
-    for cbn in column_base_names:
-        if cbn not in column_names:
-            column_names = [cbn] + column_names
-    column_added_names = [cn for cn in column_names if cn not in column_base_names]
-
+        column_names = _default_column_names()
+    column_base_names = _default_column_base_names()
+    column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
+  
     # Initialize the dataframe
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
@@ -420,18 +463,10 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name==session_name].index.values)
     # Set the column names
     if column_names is None:
-        column_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid', 'target_region', 'depth_order', 'bisect_layer']
-    # from the expt_table, check the column names and remove the ones that are not in the experiment table
-    expt_column_names = expt_group.expt_table.columns.values
-    for cn in column_names:
-        if cn not in expt_column_names:
-            column_names.remove(cn)
-    column_base_names = ['cell_specimen_id', 'trace', 'timepoints', 'oeid']  # These are the columns that are always in the dataframe
-    for cbn in column_base_names:
-        if cbn not in column_names:
-            column_names = [cbn] + column_names
-    column_added_names = [cn for cn in column_names if cn not in column_base_names]
-
+        column_names = _default_column_names()
+    column_base_names = _default_column_base_names()
+    column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
+  
     # load all the traces from this session
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
@@ -461,7 +496,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
             timepoints = np.concatenate([st + tts[1:] for st, tts in zip(csid_df.start_time.values, csid_df.trace_timestamps.values)])
             assert len(timepoints) == len(trace_all[0])
             
-            temp_df = pd.DataFrame(columns=['cell_specimen_id', 'trace', 'oeid', 'target_region', 'depth_order', 'bisect_layer'])
+            temp_df = pd.DataFrame(columns=column_names)
             temp_df['cell_specimen_id'] = csids
             temp_df['trace'] = trace_all
             temp_df['timepoints'] = [timepoints] * len(csids)
@@ -551,9 +586,33 @@ def get_trace_df_event_from_all_response_df(response_df_session, expt_group, eve
     return trace_df
 
 
-def get_trace_df_from_response_df_session(response_df_session, expt_group, inter_image_interval=0.75):
+def get_trace_df_from_response_df_session(response_df_session, expt_group, inter_image_interval=0.75, column_names=None):
+    """Get trace DataFrame from all experiments in a session
+
+    Parameters
+    ----------
+    response_df_session: pandas DataFrame
+        DataFrame with stimulus presentations for all experiments in a session
+    expt_group: Experiment group object
+        Experiment group object for Learning and mFISH project
+    inter_image_interval: float, optional
+        Inter image interval in seconds, default 0.75
+    column_names: list, optional
+        List of column names to add to the trace DataFrame, default None
     
-    trace_df = pd.DataFrame(columns=['cell_specimen_id', 'trace', 'oeid', 'target_region', 'depth_order', 'bisect_layer']).set_index('cell_specimen_id')
+    Returns
+    -------
+    trace_df: pandas DataFrame
+        DataFrame with traces for all experiments in a session
+    """
+    # Set the column names
+    if column_names is None:
+        column_names = _default_column_names()
+    column_base_names = _default_column_base_names()
+    column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
+  
+    # Initialize the trace DataFrame
+    trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     oeids = np.sort(response_df_session.oeid.unique())
     for oeid in oeids:
         response_df_oeid = response_df_session.query('oeid==@oeid')
@@ -570,14 +629,13 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
             csid_trace = np.concatenate(csid_df.trace.apply(lambda x: x[start_index:end_index]).values)
             trace_all.append(csid_trace)
         
-        temp_df = pd.DataFrame(columns=['cell_specimen_id', 'trace', 'oeid', 'target_region', 'depth_order', 'bisect_layer'])
+        temp_df = pd.DataFrame(columns=column_names)
         
         temp_df['cell_specimen_id'] = csids
         temp_df['trace'] = trace_all
         temp_df['oeid'] = oeid
-        temp_df['target_region'] = expt_group.expt_table.loc[oeid].targeted_structure
-        temp_df['depth_order'] = expt_group.expt_table.loc[oeid].depth_order
-        temp_df['bisect_layer'] = expt_group.expt_table.loc[oeid].bisect_layer
+        for cn in column_added_names:
+            temp_df[cn] = expt_group.expt_table.loc[oeid][cn]
         temp_df.set_index('cell_specimen_id', inplace=True)
         temp_df.sort_index(inplace=True)
         trace_df = pd.concat([trace_df, temp_df])

@@ -76,7 +76,7 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
 
     numcell_cumsum = np.cumsum([x[0] for x in trace_df.groupby(['oeid']).count().values])
     xy_ticks = np.insert(numcell_cumsum, 0, 0)
-    xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first().target_region.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
+    xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first().targeted_structure.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
     xy_label_pos = xy_ticks[:-1] + np.diff(xy_ticks) / 2
 
     # order the corr matrix by the mean correlation of each cell within each oeid
