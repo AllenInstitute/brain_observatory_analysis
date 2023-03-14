@@ -196,18 +196,22 @@ def get_trace_df_no_task(expt_group, session_name, trace_type='dff', column_name
     for oeid in oeids:
         # Initialize for each experiment
         temp_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
-
         if trace_type == 'dff':
             trace_df = expt_group.experiments[oeid].dff_traces
         elif trace_type == 'events':
             trace_df = expt_group.experiments[oeid].events
         else:
             raise ValueError('trace_type must be dff or events')
+        csid = trace_df.index.values
+        
+        if None in csid:  # Skip if None in cell_specimen_id (cell matching not done)
+            continue
+
         timestamps = expt_group.experiments[oeid].ophys_timestamps
         # cell_specimen_id, oeid, targeted_structure, depth_order, bisect_layer are the same
         # across epochs in no-task window
         # Only switch trace and timepoints for each epoch
-        csid = trace_df.index.values
+        
         temp_df['cell_specimen_id'] = csid        
         temp_df['oeid'] = oeid
         for cn in column_added_names:
@@ -352,6 +356,9 @@ def get_trace_df_task(expt_group, session_name, remove_auto_rewarded=True, colum
         temp_df = pd.DataFrame(columns=column_names)
 
         dff_df = expt_group.experiments[oeid].dff_traces
+        csid = dff_df.index.values
+        if None in csid:  # skip the experiment if cell matching was not done
+            continue
         test_dff = dff_df.iloc[0].dff
         timestamps = expt_group.experiments[oeid].ophys_timestamps
         assert len(test_dff) == len(timestamps)
@@ -470,6 +477,9 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
     # load all the traces from this session
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
+        csids = expt_group.experiments[oeid].cell_specimen_table.index.values
+        if None in csids:  # skip experiments with None cell_specimen_ids (cell matching not done)
+            continue
         if event_type=='images>n-changes':
             response_df = get_event_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=event_type, image_order=image_order,
                                                           inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
