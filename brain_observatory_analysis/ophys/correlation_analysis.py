@@ -173,32 +173,33 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
                'remove_inds': []}
 
     trace_task_df = df.get_trace_df_task(lamf_group, session_name)
-    results = _append_results(results, trace_task_df, 'task')
-    
-    trace_graypre_df, trace_graypost_df, trace_fingerprint_df = df.get_trace_df_no_task(lamf_group, session_name)
-    if len(trace_graypre_df) > 0:
-        assert (trace_task_df.index.values - trace_graypre_df.index.values).any() == False  # noqa: E712
-        results = _append_results(results, trace_graypre_df, 'graypre')
+    if len(trace_task_df) > 0:
+        results = _append_results(results, trace_task_df, 'task')
+        
+        trace_graypre_df, trace_graypost_df, trace_fingerprint_df = df.get_trace_df_no_task(lamf_group, session_name)
+        if len(trace_graypre_df) > 0:
+            assert (trace_task_df.index.values - trace_graypre_df.index.values).any() == False  # noqa: E712
+            results = _append_results(results, trace_graypre_df, 'graypre')
 
-    if len(trace_graypost_df) > 0:
-        assert (trace_task_df.index.values - trace_graypost_df.index.values).any() == False  # noqa: E712
-        results = _append_results(results, trace_graypost_df, 'graypost')
-    
-    if len(trace_fingerprint_df) > 0:
-        assert (trace_task_df.index.values - trace_fingerprint_df.index.values).any() == False  # noqa: E712
-        results = _append_results(results, trace_fingerprint_df, 'fingerprint')
-    
-    events = ['images>n-changes', 'changes', 'omissions']
-    for event in events:
-        trace_event_df = df.get_trace_df_event(lamf_group, session_name=session_name, event_type=event,
-                                               image_order=image_order, inter_image_interval=inter_image_interval, 
-                                               output_sampling_rate=output_sampling_rate)
-        if len(trace_event_df) > 0:
-            assert (trace_task_df.index.values - trace_event_df.index.values).any() == False  # noqa: E712
-            if event == 'images>n-changes':
-                event = 'images'
-            results = _append_results(results, trace_event_df, event)
-    
+        if len(trace_graypost_df) > 0:
+            assert (trace_task_df.index.values - trace_graypost_df.index.values).any() == False  # noqa: E712
+            results = _append_results(results, trace_graypost_df, 'graypost')
+        
+        if len(trace_fingerprint_df) > 0:
+            assert (trace_task_df.index.values - trace_fingerprint_df.index.values).any() == False  # noqa: E712
+            results = _append_results(results, trace_fingerprint_df, 'fingerprint')
+        
+        events = ['images>n-changes', 'changes', 'omissions']
+        for event in events:
+            trace_event_df = df.get_trace_df_event(lamf_group, session_name=session_name, event_type=event,
+                                                   image_order=image_order, inter_image_interval=inter_image_interval, 
+                                                   output_sampling_rate=output_sampling_rate)
+            if len(trace_event_df) > 0:
+                assert (trace_task_df.index.values - trace_event_df.index.values).any() == False  # noqa: E712
+                if event == 'images>n-changes':
+                    event = 'images'
+                results = _append_results(results, trace_event_df, event)
+        
     epochs, trace_dfs, corr_matrices, corr_ordered_matrices, corr_ordered_by_region_matrices, \
         xy_label_pos_list, xy_labels_list, sorted_inds_list, remove_inds_list = results.values()
 
