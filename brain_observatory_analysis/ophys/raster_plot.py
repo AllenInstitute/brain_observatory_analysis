@@ -8,13 +8,17 @@ from brain_observatory_analysis.utilities import data_utils as du
 
 
 def _get_pupil_diameter(exp):
-    eye_timestamps = exp.eye_tracking.timestamps.values
-    if 'pupil_diameter' in exp.eye_tracking.columns:
-        pupil_diameter = exp.eye_tracking.pupil_diameter.values
-    elif 'pupil_area' in exp.eye_tracking.columns:
-        pupil_diameter = np.sqrt(exp.eye_tracking.pupil_area.values / np.pi)
+    if len(exp.eye_tracking) > 0:  # Sometimes, eye_tracking is empty
+        eye_timestamps = exp.eye_tracking.timestamps.values
+        if 'pupil_diameter' in exp.eye_tracking.columns:
+            pupil_diameter = exp.eye_tracking.pupil_diameter.values
+        elif 'pupil_area' in exp.eye_tracking.columns:
+            pupil_diameter = np.sqrt(exp.eye_tracking.pupil_area.values / np.pi)
+        else:
+            pupil_diameter = None
     else:
         pupil_diameter = None
+        eye_timestamps = None
     return pupil_diameter, eye_timestamps
 
 
@@ -67,13 +71,13 @@ def plot_task_raster_with_behav_sort_by_corr(
 
         # Add pupil diameter by interpolating to the timepoints
         pupil_diameter, eye_timestamps = _get_pupil_diameter(exp)
+        pax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
         if pupil_diameter is not None:
             pupil_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
-            pax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
             pax.plot(pupil_interp, color='black')
-            pax.set_xlim(0, len(task_trace_all_mean))
-            pax.set_xticks([])
-            pax.set_title('Pupil diameter (AU)', loc='left', fontsize=sub_title_fontsize, color='black')
+        pax.set_xlim(0, len(task_trace_all_mean))
+        pax.set_xticks([])
+        pax.set_title('Pupil diameter (AU)', loc='left', fontsize=sub_title_fontsize, color='black')
 
         # # Add licks to the nearest timepoints
         # licktimes = exp.licks.timestamps.values
