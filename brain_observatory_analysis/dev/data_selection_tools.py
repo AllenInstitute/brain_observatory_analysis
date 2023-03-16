@@ -1,9 +1,9 @@
-import os
-import json
+# import os
+# import json
 # import warnings
 import numpy as np
 import pandas as pd
-from pathlib import Path
+# from pathlib import Path
 
 from allensdk.brain_observatory.behavior.behavior_project_cache import \
     VisualBehaviorOphysProjectCache
@@ -31,6 +31,7 @@ def add_layer_column(df):
 
     return df
 
+
 def add_area_layer_column(df):
     """
     creates columns called 'area_layer' and that contains the conjunction of 'targeted_area' and 'layer'
@@ -44,15 +45,17 @@ def add_area_layer_column(df):
         df.loc[row, 'area_layer'] = area + '_' + layer
     return df
 
+
 def dateformat(exp_date):
     """
     reformat date of acquisition for accurate sorting by date
     """
     from datetime import datetime
     if exp_date is not str:
-        exp_date = str(exp_date)[:-3] # remove 3 zeros from seconds, otherwise the str is too long
+        exp_date = str(exp_date)[:-3]  # remove 3 zeros from seconds, otherwise the str is too long
     date = int(datetime.strptime(exp_date, '%Y-%m-%d  %H:%M:%S.%f').strftime('%Y%m%d'))
     return date
+
 
 def add_date_string(df):
     """
@@ -61,6 +64,7 @@ def add_date_string(df):
     """
     df['date'] = df['date_of_acquisition'].apply(dateformat)
     return df
+
 
 def add_first_novel_column(df):
     """
@@ -71,6 +75,7 @@ def add_first_novel_column(df):
     indices = df[(df.session_number == 4) & (df.prior_exposures_to_image_set == 0)].index.values
     df.loc[indices, 'first_novel'] = True
     return df
+
 
 def get_n_relative_to_first_novel(group):
     """
@@ -106,6 +111,7 @@ def add_n_relative_to_first_novel_column(df):
         df.loc[indices, 'n_relative_to_first_novel'] = list(numbers.loc[container_id].n_relative_to_first_novel)
     return df
 
+
 def add_last_familiar_column(df):
     """
     adds column to df called 'last_familiar' which indicates (with a Boolean) whether
@@ -119,6 +125,7 @@ def add_last_familiar_column(df):
     indices = df[(df.n_relative_to_first_novel == -1) & (df.experience_level == 'Familiar')].index.values
     df.loc[indices, 'last_familiar'] = True
     return df
+
 
 def add_second_novel_column(df):
     """
@@ -145,7 +152,7 @@ def limit_to_last_familiar_second_novel(df):
     if 'second_novel' not in df.columns:
         df = add_second_novel_column(df)
     # drop novel sessions that arent the second one
-    indices = df[(df.experience_level == 'Novel >1') & (df.second_novel == False)].index.values
+    indices = df[(df.experience_level == 'Novel >1') & (df.second_novel == False)].index.values # noqa
     df = df.drop(labels=indices, axis=0)
 
     print('dropped', len(indices), 'experiments that were not the second novel session')
@@ -153,7 +160,7 @@ def limit_to_last_familiar_second_novel(df):
     if 'last_familiar' not in df.columns:
         df = add_last_familiar_column(df)
     # drop Familiar sessions that arent the last one
-    indices = df[(df.experience_level == 'Familiar') & (df.last_familiar == False)].index.values
+    indices = df[(df.experience_level == 'Familiar') & (df.last_familiar == False)].index.values # noqa
     df = df.drop(labels=indices, axis=0)
 
     print('dropped', len(indices), 'experiments that were not the last familiar session')
@@ -163,18 +170,20 @@ def limit_to_last_familiar_second_novel(df):
 
 # Cell specimen table
 
+
 def add_experience_level_column(cells_table, experiment_table=None):
     """
     adds column to cells_table called 'experience_level' which indicates the experience level of the session for each cell
     input cells_table must have column 'ophys_experiment_id', such as in ophys_cells_table
     """
-   
-    if experiment_table == None:
+
+    if experiment_table is None:
         experiment_table = cache.get_ophys_experiment_table()
-        
+
     cells_table = cells_table.merge(experiment_table.reset_index()[['ophys_experiment_id', 'experience_level']], on='ophys_experiment_id', how='left')
-    print('adding column "ophys_experiment_id"')
+    print('adding column "exprience_level" ')
     return cells_table
+
 
 def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table=None):
     """
@@ -190,11 +199,11 @@ def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_tab
     return cell_specimen_ids_with_all_experience_levels
 
 
-def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table):
+def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table, experiment_table=None):
     """
     returns dataframe limited to cell_specimen_ids that are present in all 3 experience levels in ['Familiar', 'Novel 1', 'Novel >1']
     input dataframe is typically ophys_cells_table but can be any df with columns 'cell_specimen_id' and 'experience_level'
     """
-    cell_specimen_ids_with_all_experience_levels = get_cell_specimen_ids_with_all_experience_levels(cells_table)
+    cell_specimen_ids_with_all_experience_levels = get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table)
     matched_cells_table = cells_table[cells_table.cell_specimen_id.isin(cell_specimen_ids_with_all_experience_levels)].copy()
     return matched_cells_table
