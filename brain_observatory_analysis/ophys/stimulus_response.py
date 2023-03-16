@@ -15,6 +15,10 @@ from .experiment_group import ExperimentGroup
 
 from brain_observatory_analysis.behavior.change_detection.data_wrangling.extended_stimulus_presentations import get_extended_stimulus_presentations
 
+import hashlib
+
+import pickle
+
 
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           event_type: str = "changes",
@@ -55,15 +59,14 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                 get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
                                                     expt.licks,
                                                     expt.rewards,
-                                                    expt.running_speed, 
+                                                    expt.running_speed,
                                                     expt.eye_tracking)
-
 
             sdf = _get_stimulus_response_df(expt,
                                             event_type=event_type,
                                             data_type=data_type,
                                             load_from_file=load_from_file,
-                                            save_to_file=False)
+                                            save_to_file=True)
             
             sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
             mdf = get_standard_mean_df(sdf)
@@ -99,7 +102,8 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                               output_sampling_rate: float = 10.7,
                               save_to_file: bool = False,
                               load_from_file: bool = False,
-                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"):
+                              # # "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"
+                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df"):
     """Helper function for get_stimulus_response_df
 
     Parameters
@@ -145,13 +149,14 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
     # frame_rate = experiment.metadata["ophys_frame_rate"]
 
     try:
+
         # may implement later, using unique filenames
         # now = datetime.datetime.now()
         # dt_string = now.strftime("%d_%m_%Y_%H_%M_%S")
         # base_fn = f"{expt_id}_{data_type}_{event_type}.pkl"
         # unique_fn = f"{dt_string}_{base_fn}"
-
-        fn = f"{expt_id}_{data_type}_{event_type}.pkl"
+        base_fn = f"{expt_id}_{data_type}_{event_type}"
+        fn = f"{base_fn}.pkl"
 
         if (cache_dir / fn).exists() and load_from_file:
             sdf = pd.read_pickle(cache_dir / fn)
@@ -169,17 +174,27 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                                            response_window_duration=response_window_duration,
                                            interpolate=interpolate,
                                            output_sampling_rate=output_sampling_rate)
-
-            # gather all inputs into params dict
-            params = {"event_type": event_type,
-                      "data_type": data_type,
-                      "output_sampling_rate": output_sampling_rate,
-                      "time_window": time_window,
-                      "response_window_duration": response_window_duration,
-                      "interpolate": interpolate
-            }
-            
             if save_to_file:
+                print('dave')
+                # gather all inputs into params dict
+                func_params = {"event_type": event_type,
+                               "data_type": data_type,
+                               "output_sampling_rate": output_sampling_rate,
+                               "time_window": time_window,
+                               "response_window_duration": response_window_duration,
+                               "interpolate": interpolate
+                               }
+                
+                # save dff has to see if anything changes later
+                data_verify = {# "cell_specimen_id": experiment.cell_specimen_table.index.values,
+                               # "cell_roi_id": experiment.cell_specimen_table["cell_roi_id"].values,
+                               "dff_hash": hashlib.sha256(pickle.dumps(experiment.dff_traces.values)).hexdigest()}
+
+                params = {"experiment_id": expt_id,
+                          "data_verify": data_verify,
+                          "function": "_get_stimulus_response_df",
+                          "function_params": func_params}
+                
                 if (cache_dir / fn).exists():
                     print(f"Overwriting stim response df for {expt_id} in file")
                 sdf.to_pickle(cache_dir / fn)
@@ -188,7 +203,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                 params["stimulus_response_df_path"] = str(cache_dir / fn)
 
                 # save params to file
-                with open(cache_dir / f"{fn}_params.json", "w") as f:
+                with open(cache_dir / f"{base_fn}_params.json", "w") as f:
                     json.dump(params, f)
         return sdf
     except Exception as e:
@@ -204,7 +219,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
 def get_standard_mean_df(sr_df):
     time_window = [-3, 3.1]
     output_sampling_rate = 10.7
-    get_pref_stim = True  # relevant to image_name conditions
+    get_pref_stim = False  # relevant to image_name conditions
     exclude_omitted_from_pref_stim = True  # relevant to image_name conditions  
 
     if "response_window_duration" in sr_df.keys():
@@ -215,9 +230,8 @@ def get_standard_mean_df(sr_df):
 
     if get_pref_stim:
         # options for groupby "change_image_name", "image_name", "prior_image_name"
-        #conditions.append('change_image_name')
+        # conditions.append('change_image_name')
         conditions.append('image_name')
-    print(conditions)
     mdf = get_mean_df(sr_df,
                       conditions=conditions,
                       frame_rate=output_sampling_rate,
@@ -252,8 +266,6 @@ def get_mean_df(stim_response_df: pd.DataFrame,
     response_window_duration = response_window_duration_seconds
 
     rdf = stim_response_df.copy()
-    conditions = ['cell_roi_id', 'image_name'] 
-    print("conditions HARDCODED: ", conditions)
     mdf = rdf.groupby(conditions).apply(get_mean_sem_trace)
     mdf = mdf[['mean_response', 'sem_response', 'mean_trace', 'sem_trace',
                'trace_timestamps', 'mean_responses', 'mean_baseline', 'sem_baseline']]
