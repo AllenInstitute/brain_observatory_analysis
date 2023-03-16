@@ -108,6 +108,8 @@ def add_last_familiar_column(df):
     If a container has no truly first novel session, all sessions are labeled as NaN
     input df must have 'experience_level' and 'n_relative_to_first_novel'
     """
+    if 'n_relative_to_first_novel' not in df.columns:
+        df = add_n_relative_to_first_novel_column(df)
     df['last_familiar'] = False
     indices = df[(df.n_relative_to_first_novel == -1) & (df.experience_level == 'Familiar')].index.values
     df.loc[indices, 'last_familiar'] = True
@@ -120,7 +122,10 @@ def add_second_novel_column(df):
     If a container has no truly first novel session, all sessions are labeled as NaN
     input df must have 'experience_level' and 'n_relative_to_first_novel'
     """
+    if 'n_relative_to_first_novel' not in df.columns:
+        df = add_n_relative_to_first_novel_column(df)
     df['second_novel'] = False
+
     indices = df[(df.n_relative_to_first_novel == 1) & (df.experience_level == 'Novel >1')].index.values
     df.loc[indices, 'second_novel'] = True
     return df
@@ -131,13 +136,14 @@ def limit_to_last_familiar_second_novel(df):
     Drops rows that are not the last familiar session or the second novel session
     """
 
-    if 'second_novel' in df.columns == False:
+    if 'second_novel' not in df.columns:
+        print('adding seccond novel column')
         df = add_second_novel_column(df)
     # drop novel sessions that arent the second one
     indices = df[(df.experience_level == 'Novel >1') & (df.second_novel == False)].index.values
     df = df.drop(labels=indices, axis=0)
 
-    if 'last_familiar' in df.columns == False:
+    if 'last_familiar' not in df.columns:
         df = add_last_familiar_column(df)
     # drop Familiar sessions that arent the last one
     indices = df[(df.experience_level == 'Familiar') & (df.last_familiar == False)].index.values
