@@ -18,7 +18,7 @@ def add_layer_column(df):
     """
     df.loc[:, 'layer'] = None
 
-    indices = df[(df.depth < 250)].index.values
+    indices = df[(df.depth <= 250)].index.values
     df.loc[indices, 'layer'] = 'upper'
 
     indices = df[(df.depth > 250)].index.values
@@ -44,6 +44,8 @@ def dateformat(exp_date):
     reformat date of acquisition for accurate sorting by date
     """
     from datetime import datetime
+    if exp_date is not str:
+        exp_date = str(exp_date)[:-3] # remove 3 zeros from seconds, otherwise the str is too long
     date = int(datetime.strptime(exp_date, '%Y-%m-%d  %H:%M:%S.%f').strftime('%Y%m%d'))
     return date
 
