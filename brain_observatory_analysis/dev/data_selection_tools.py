@@ -5,6 +5,11 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from allensdk.brain_observatory.behavior.behavior_project_cache import \
+    VisualBehaviorOphysProjectCache
+
+cache = VisualBehaviorOphysProjectCache.from_lims()
+
 # import logging
 # logger = logging.getLogger(__name__)
 
@@ -135,13 +140,15 @@ def limit_to_last_familiar_second_novel(df):
     """
     Drops rows that are not the last familiar session or the second novel session
     """
+    print('starting with', len(df), 'experiments...')
 
     if 'second_novel' not in df.columns:
-        print('adding seccond novel column')
         df = add_second_novel_column(df)
     # drop novel sessions that arent the second one
     indices = df[(df.experience_level == 'Novel >1') & (df.second_novel == False)].index.values
     df = df.drop(labels=indices, axis=0)
+
+    print('dropped', len(indices), 'experiments that were not the second novel session')
 
     if 'last_familiar' not in df.columns:
         df = add_last_familiar_column(df)
@@ -149,4 +156,45 @@ def limit_to_last_familiar_second_novel(df):
     indices = df[(df.experience_level == 'Familiar') & (df.last_familiar == False)].index.values
     df = df.drop(labels=indices, axis=0)
 
+    print('dropped', len(indices), 'experiments that were not the last familiar session')
+    print('ending with', len(df), 'experiments')
+
     return df
+
+# Cell specimen table
+
+def add_experience_level_column(cells_table, experiment_table=None):
+    """
+    adds column to cells_table called 'experience_level' which indicates the experience level of the session for each cell
+    input cells_table must have column 'ophys_experiment_id', such as in ophys_cells_table
+    """
+   
+    if experiment_table == None:
+        experiment_table = cache.get_ophys_experiment_table()
+        
+    cells_table = cells_table.merge(experiment_table.reset_index()[['ophys_experiment_id', 'experience_level']], on='ophys_experiment_id', how='left')
+    print('adding column "ophys_experiment_id"')
+    return cells_table
+
+def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table=None):
+    """
+    identifies cell_specimen_ids with all 3 experience levels in ['Familiar', 'Novel 1', 'Novel >1'] in the input dataframe
+    input dataframe must have column 'cell_specimen_id', such as in ophys_cells_table
+    """
+
+    if 'oexperience_level' not in cells_table.columns:
+        cells_table = add_experience_level_column(cells_table, experiment_table)
+
+    experience_level_counts = cells_table.groupby(['cell_specimen_id', 'experience_level']).count().reset_index().groupby(['cell_specimen_id']).count()[['experience_level']]
+    cell_specimen_ids_with_all_experience_levels = experience_level_counts[experience_level_counts.experience_level == 3].index.unique()
+    return cell_specimen_ids_with_all_experience_levels
+
+
+def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table):
+    """
+    returns dataframe limited to cell_specimen_ids that are present in all 3 experience levels in ['Familiar', 'Novel 1', 'Novel >1']
+    input dataframe is typically ophys_cells_table but can be any df with columns 'cell_specimen_id' and 'experience_level'
+    """
+    cell_specimen_ids_with_all_experience_levels = get_cell_specimen_ids_with_all_experience_levels(cells_table)
+    matched_cells_table = cells_table[cells_table.cell_specimen_id.isin(cell_specimen_ids_with_all_experience_levels)].copy()
+    return matched_cells_table
