@@ -130,10 +130,15 @@ def limit_to_last_familiar_second_novel(df):
     """
     Drops rows that are not the last familiar session or the second novel session
     """
+
+    if 'second_novel' in df.columns == False:
+        df = add_second_novel_column(df)
     # drop novel sessions that arent the second one
     indices = df[(df.experience_level == 'Novel >1') & (df.second_novel == False)].index.values
     df = df.drop(labels=indices, axis=0)
 
+    if 'last_familiar' in df.columns == False:
+        df = add_last_familiar_column(df)
     # drop Familiar sessions that arent the last one
     indices = df[(df.experience_level == 'Familiar') & (df.last_familiar == False)].index.values
     df = df.drop(labels=indices, axis=0)
