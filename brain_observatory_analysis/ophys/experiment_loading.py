@@ -48,24 +48,27 @@ def start_lamf_analysis(verbose=False):
 
     # TODO parallelize : see dask update
     # https://stackoverflow.com/questions/45545110/make-pandas-dataframe-apply-use-all-cores
+
     check_params = False
     if check_params:
         recent_expts["new_mc_params"] = apply_func_df_row(
             recent_expts, check_expt_mc_params)
 
+    # TODO: need to filter by project mice before this
     recent_expts = etu.experiment_table_extended(recent_expts)
 
+    # filter by lamftask1a mice
+    names = ["Gold", "Silver", "Bronze", "Copper", "Nickle",
+             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron"]
+    recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
+
+    recent_expts = etu.experiment_table_extended_project(recent_expts,
+                                                         project="LearningmFISHTask1A")
     if verbose:
         print('')
         print(recent_expts.groupby("project_code").project_code.count())
         print('')
         print(recent_expts.groupby("mouse_name").mouse_name.count())
-
-    # filter by lamf mice
-    names = ["Gold", "Silver", "Bronze", "Copper", "Nickle",
-             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron"]
-    recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
-    print("WARNING: filtered by lamf mice")
 
     # sort by date_of_acquisition
     recent_expts = recent_expts.sort_values(by="date_of_acquisition")
@@ -82,9 +85,11 @@ def start_gh_analysis():
 
 
 def start_vb_analysis():
-    # TODO: fill in please :)
-    expts = None
-    return expts
+    projects = ['VisualBehaviorMultiscope', 'VisualBehavior', 'VisualBehaviorTask1B']
+    expt_table = get_expts(projects=projects,
+                           pkl_workaround=False)
+    expt_table = etu.experiment_table_extended(expt_table)
+    return expt_table
 
 
 def apply_func_df(df, func):
@@ -197,7 +202,8 @@ def display_expt_table(df, extra_cols=[]):
 def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
                      multi: bool = True,
                      return_failed=False,
-                     dev=False) -> dict:
+                     dev=False,
+                     skip_eye_tracking=False) -> dict:
     """Load expts from LIMS and return datasets, single or multi core
 
     Parameters
@@ -229,14 +235,16 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
         data_dict = \
             get_ophys_expt_multi(expts_to_analyze,
                                  return_failed=return_failed,
-                                 dev=dev)
+                                 dev=dev,
+                                 skip_eye_tracking=skip_eye_tracking)
     # TODO return failed for this case
     else:
         datasets_dict = {}
         for expt_id in expts_to_analyze:
             datasets_dict.update(get_ophys_expt(expt_id,
                                                 as_dict=True,
-                                                dev=dev))
+                                                dev=dev,
+                                                skip_eye_tracking=skip_eye_tracking))
     if return_failed:
         failed = None  # TODO: check is needed
         return data_dict, failed
@@ -245,6 +253,7 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
 
 
 def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
+                   skip_eye_tracking=False,
                    dev=False, **kwargs) -> Union[BehaviorOphysExperiment, dict]:
     """get ophys experiment from lims
 
@@ -276,9 +285,11 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
         print(f"Loading expt: {ophys_expt_id}\n")
         if not dev:
             experiment = BehaviorOphysExperiment.from_lims(ophys_expt_id,
+                                                           skip_eye_tracking=skip_eye_tracking,
                                                            **kwargs)
         else:
             experiment = BehaviorOphysExperimentDev(ophys_expt_id,
+                                                    skip_eye_tracking=skip_eye_tracking,
                                                     **kwargs)
         if as_dict:
             return {ophys_expt_id: experiment}
@@ -295,7 +306,8 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
 
 def get_ophys_expt_multi(expt_ids: list,
                          return_failed: bool = False,
-                         dev=False) -> dict:
+                         dev=False,
+                         skip_eye_tracking=False) -> dict:
     """Use multiprocessing to load list of ophys experiments
 
     Parameters
@@ -314,7 +326,7 @@ def get_ophys_expt_multi(expt_ids: list,
 
     with mp.Pool(mp.cpu_count() - 2) as P:
         func = partial(get_ophys_expt, as_dict=True, dev=dev,
-                       skip_eye_tracking=True)
+                       skip_eye_tracking=skip_eye_tracking)
         result = P.map(func, expt_ids)
 
     # remove failures from result, store in another list
