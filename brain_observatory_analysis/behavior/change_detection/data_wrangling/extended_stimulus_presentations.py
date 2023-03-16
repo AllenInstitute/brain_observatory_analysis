@@ -19,7 +19,7 @@ def stimulus_presentations_sdk_keys(esp):
 
 
 # TODO: USE ANNOTATE LICKS 
-def get_extended_stimulus_presentations(stimulus_presentations_df: pd.DataFrame, 
+def get_extended_stimulus_presentations(stimulus_presentations_df: pd.DataFrame,
                                         licks: pd.DataFrame,
                                         rewards: pd.DataFrame,
                                         running_speed: pd.DataFrame,
@@ -96,15 +96,17 @@ def get_extended_stimulus_presentations(stimulus_presentations_df: pd.DataFrame,
     spdf = add_mean_running_speed(spdf, running_speed)
 
     # LICKS
+    spdf = add_licks_each_flash(spdf, licks)
     spdf['licked'] = [True if len(licks) > 0 else False for licks in
                       spdf.licks.values]
     
     spdf['lick_rate'] = spdf['licked'].rolling(window=320, min_periods=1,
                                                win_type='triang').mean() / .75
     spdf = add_response_latency(spdf)
-    spdf = add_licks_each_flash(spdf, licks)
+    
 
     # REWARDS
+    spdf = add_rewards_each_flash(spdf, rewards)
     spdf['rewarded'] = [True if len(rewards) > 0 else False for rewards in spdf.rewards.values]
 
     # (rewards/stimulus)*(1 stimulus/.750s) = rewards/second
@@ -117,7 +119,7 @@ def get_extended_stimulus_presentations(stimulus_presentations_df: pd.DataFrame,
         spdf['rewarded'].rolling(window=320, min_periods=1, 
                                  win_type='triang').mean() * (60 / .75)  # units of rewards/min
     
-    spdf = add_rewards_each_flash(spdf, rewards)
+    
 
     spdf = add_engagment_state_1(spdf, reward_threshold=2 / 3)
     spdf = add_engagment_state_2(spdf)
