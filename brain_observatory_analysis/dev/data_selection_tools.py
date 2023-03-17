@@ -4,12 +4,7 @@
 import numpy as np
 import pandas as pd
 # from pathlib import Path
-
-from allensdk.brain_observatory.behavior.behavior_project_cache import \
-    VisualBehaviorOphysProjectCache
-
-# TO DO: change experiment table loading to not use cache
-cache = VisualBehaviorOphysProjectCache.from_lims()
+from brain_observatory_analysis.ophys.experiment_loading import start_lamf_analysis
 
 # import logging
 # logger = logging.getLogger(__name__)
@@ -161,7 +156,7 @@ def add_experience_level_column(cells_table, experiment_table=None):
     """
 
     if experiment_table is None:
-        experiment_table = cache.get_ophys_experiment_table()
+        experiment_table = start_lamf_analysis()
 
     cells_table = cells_table.merge(experiment_table.reset_index()[['ophys_experiment_id', 'experience_level']], on='ophys_experiment_id', how='left')
     print('adding column "exprience_level" ')
