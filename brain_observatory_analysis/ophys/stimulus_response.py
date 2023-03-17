@@ -175,7 +175,6 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                                            interpolate=interpolate,
                                            output_sampling_rate=output_sampling_rate)
             if save_to_file:
-                print('dave')
                 # gather all inputs into params dict
                 func_params = {"event_type": event_type,
                                "data_type": data_type,
