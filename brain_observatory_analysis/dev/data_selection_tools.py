@@ -163,14 +163,25 @@ def add_experience_level_column(cells_table, experiment_table=None):
     return cells_table
 
 
+def selected_experience_levels():
+    """
+    returns a list of experience levels to be used in analysis
+    """
+    return ['Familiar', 'Novel 1', 'Novel >1']
+
+
 def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table=None):
     """
     identifies cell_specimen_ids with all 3 experience levels in ['Familiar', 'Novel 1', 'Novel >1'] in the input dataframe
     input dataframe must have column 'cell_specimen_id', such as in ophys_cells_table
     """
 
-    if 'oexperience_level' not in cells_table.columns:
+    if 'experience_level' not in cells_table.columns:
         cells_table = add_experience_level_column(cells_table, experiment_table)
+
+    # make sure that there None experience levels are not in the table
+    sel = selected_experience_levels()
+    cells_table = cells_table[cells_table['experience_level'].isin(sel)]
 
     experience_level_counts = cells_table.groupby(['cell_specimen_id', 'experience_level']).count().reset_index().groupby(['cell_specimen_id']).count()[['experience_level']]
     cell_specimen_ids_with_all_experience_levels = experience_level_counts[experience_level_counts.experience_level == 3].index.unique()
