@@ -188,11 +188,15 @@ def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_tab
     return cell_specimen_ids_with_all_experience_levels
 
 
-def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table, experiment_table=None):
+def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table, experiment_table=None, drop_extra_oeids=True):
     """
     returns dataframe limited to cell_specimen_ids that are present in all 3 experience levels in ['Familiar', 'Novel 1', 'Novel >1']
     input dataframe is typically ophys_cells_table but can be any df with columns 'cell_specimen_id' and 'experience_level'
     """
     cell_specimen_ids_with_all_experience_levels = get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table)
     matched_cells_table = cells_table[cells_table.cell_specimen_id.isin(cell_specimen_ids_with_all_experience_levels)].copy()
+
+    if drop_extra_oeids:
+        oeids = experiment_table.index.values
+        matched_cells_table = matched_cells_table[matched_cells_table.ophys_experiment_id.isin(oeids)]
     return matched_cells_table
