@@ -22,6 +22,42 @@ def _get_pupil_diameter(exp):
     return pupil_diameter, eye_timestamps
 
 
+def _get_interpolated_running(exp, timepoints):
+    running_timestamps = exp.running_speed.timestamps.values
+    running_speed = exp.running_speed.speed.values
+    running_interp = du.get_interpolated_time_series(running_timestamps, running_speed, timepoints)
+    return running_interp
+
+
+def _get_interpolated_pupil_diameter(exp, timepoints):
+    pupil_diameter, eye_timestamps = _get_pupil_diameter(exp)
+    if pupil_diameter is not None:
+        pupil_diameter_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
+    else:
+        pupil_diameter_interp = None
+    return pupil_diameter_interp
+
+
+def _get_interpolated_lickrate(exp, timepoints, lick_template_rate=100, lick_rate_window=1):
+    lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate, 
+                                   1 / lick_template_rate)  # timestamps are in seconds
+    licks = np.zeros(len(lick_time_template))
+    licktimes = exp.licks.timestamps.values
+    licktimes = licktimes[licktimes <= timepoints[-1]]
+    for licktime in licktimes:
+        # Find the nearest timepoint in timepoints to the lick timestamp
+        nearest_ind = np.argmin(np.abs(lick_time_template - licktime))
+        licks[nearest_ind] += 1
+    # calculate rate from licks with a moving window
+    lickrate = np.convolve(licks, np.ones((int(lick_template_rate * lick_rate_window),)) /
+                            int(lick_template_rate * lick_rate_window), mode='same') *\
+                            lick_template_rate / lick_rate_window  # in Hz  # noqa E127
+    # interpolate to the timepoints
+    f = scipy.interpolate.interp1d(lick_time_template, lickrate, kind='linear')
+    lickrate_interp = f(timepoints)
+    return lickrate_interp
+
+
 def plot_task_raster_with_behav_sort_by_corr(
         lamf_group, session_name, remove_auto_rewarded=True,
         lick_template_rate=100, lick_rate_window=1, sub_title_fontsize=10,
@@ -60,9 +96,7 @@ def plot_task_raster_with_behav_sort_by_corr(
         exp = lamf_group.experiments[oeid]
         timepoints = trace_df_task.iloc[0].timepoints  # First one can be the representative one
 
-        running_timestamps = exp.running_speed.timestamps.values
-        running_speed = exp.running_speed.speed.values
-        running_interp = du.get_interpolated_time_series(running_timestamps, running_speed, timepoints)
+        running_interp = _get_interpolated_running(exp, timepoints)
         rax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
         rax.plot(running_interp, color='C3')
         rax.set_xlim(0, len(task_trace_all_mean))
@@ -102,22 +136,7 @@ def plot_task_raster_with_behav_sort_by_corr(
         # lax.set_title('Licks', loc='left', fontsize=sub_title_fontsize, color='pink')
 
         # Add lick rates by interpolating to the timepoints
-        lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate, 
-                                       1 / lick_template_rate)  # timestamps are in seconds
-        licks = np.zeros(len(lick_time_template))
-        licktimes = exp.licks.timestamps.values
-        licktimes = licktimes[licktimes <= timepoints[-1]]
-        for licktime in licktimes:
-            # Find the nearest timepoint in timepoints to the lick timestamp
-            nearest_ind = np.argmin(np.abs(lick_time_template - licktime))
-            licks[nearest_ind] += 1
-        # calculate rate from licks with a moving window
-        lickrate = np.convolve(licks, np.ones((int(lick_template_rate * lick_rate_window),)) /
-                               int(lick_template_rate * lick_rate_window), mode='same') *\
-                               lick_template_rate / lick_rate_window  # in Hz  # noqa E127
-        # interpolate to the timepoints
-        f = scipy.interpolate.interp1d(lick_time_template, lickrate, kind='linear')
-        lickrate_interp = f(timepoints)
+        lickrate_interp = _get_interpolated_lickrate(exp, timepoints)
         lax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
         lax.plot(lickrate_interp, linewidth=1, color='C6')
         lax.set_xlim(0, len(task_trace_all_mean))

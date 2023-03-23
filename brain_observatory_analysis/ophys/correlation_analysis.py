@@ -4,6 +4,40 @@ import seaborn as sns
 import brain_observatory_analysis.ophys.data_formatting as df
 
 
+def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_cell_prop_threshold=0.2):
+    trace_array = np.vstack(trace_df.trace.values)
+    
+    # Check if there are too many nan frames or cells with too many nan frames
+    num_cell = len(trace_df)
+    num_nan_frames_threshold = int(trace_array.shape[1] * nan_frame_prop_threshold)
+    nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
+    num_nan_frames = len(nan_frames)
+
+    remove_ind = np.zeros(0,)
+    if num_nan_frames > num_nan_frames_threshold:
+        num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
+        ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
+        num_nan_cells = len(ind_many_nan_frames)
+        if num_nan_cells / num_cell > nan_cell_prop_threshold:
+            raise ValueError(f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
+        else:
+            print(f"Removing {num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
+            remove_ind = ind_many_nan_frames
+            trace_array = np.delete(trace_array, remove_ind, axis=0)
+            trace_df = trace_df.reset_index()
+            trace_df = trace_df.drop(trace_df.index[remove_ind])
+            trace_df = trace_df.set_index('cell_specimen_id')
+
+            nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
+            num_nan_frames = len(nan_frames)
+            trace_array = np.delete(trace_array, nan_frames, axis=1)
+            print(f"Removing {num_nan_frames} frames with nan values")
+    else:
+        print(f"Removing {num_nan_frames} frames with nan values")
+        trace_array = np.delete(trace_array, nan_frames, axis=1)
+    return trace_array, remove_ind, nan_frames
+
+
 def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_prop_threshold=0.2):
     """ Get correlation matrices for a given trace dataframe
     If number of frames with nan values is small, it's okay to just remove those frames
@@ -36,36 +70,7 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     remove_ind: np.ndarray (1d)
         Indices of cells to be removed due to large number of nan frames
     """
-    trace_array = np.vstack(trace_df.trace.values)
-    
-    # Check if there are too many nan frames or cells with too many nan frames
-    num_cell = len(trace_df)
-    num_nan_frames_threshold = int(trace_array.shape[1] * nan_frame_prop_threshold)
-    nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
-    num_nan_frames = len(nan_frames)
-
-    remove_ind = np.zeros(0,)
-    if num_nan_frames > num_nan_frames_threshold:
-        num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
-        ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
-        num_nan_cells = len(ind_many_nan_frames)
-        if num_nan_cells / num_cell > nan_cell_prop_threshold:
-            raise ValueError(f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
-        else:
-            print(f"Removing {num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
-            remove_ind = ind_many_nan_frames
-            trace_array = np.delete(trace_array, remove_ind, axis=0)
-            trace_df = trace_df.reset_index()
-            trace_df = trace_df.drop(trace_df.index[remove_ind])
-            trace_df = trace_df.set_index('cell_specimen_id')
-
-            nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
-            num_nan_frames = len(nan_frames)
-            trace_array = np.delete(trace_array, nan_frames, axis=1)
-            print(f"Removing {num_nan_frames} frames with nan values")
-    else:
-        print(f"Removing {num_nan_frames} frames with nan values")
-        trace_array = np.delete(trace_array, nan_frames, axis=1)
+    trace_array, remove_ind, _ = get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold, nan_cell_prop_threshold)
     
     corr = np.corrcoef(trace_array)
 
