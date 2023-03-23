@@ -313,3 +313,28 @@ def plot_notask_raster_with_behav_sort_by_corr(
     fig.suptitle(session_name)
     fig.tight_layout()
     return fig
+
+
+def get_traces_from_trace_df_task(exp_group, session_name, trace_df_task):
+    # Get traces and behavioral variables
+    trace_array, remove_ind, nan_frame_ind = ca.get_trace_array_from_trace_df(trace_df_task)
+    # standardize trace_array
+    # In each row, subtract the mean of the row
+    trace_array_t = trace_array.T
+    trace_array_std_t = (trace_array_t - np.mean(trace_array_t, axis=0)) / np.std(trace_array_t, axis=0)
+    trace_array_std = trace_array_std_t.T
+
+    oeid = exp_group.expt_table.query('session_name == @session_name').index.values[0]  # First one can be the representative one
+    exp = exp_group.experiments[oeid]
+    timepoints = trace_df_task.iloc[0].timepoints  # First one can be the representative one
+
+    running_interp = _get_interpolated_running(exp, timepoints)
+    pupil_interp = _get_interpolated_pupil_diameter(exp, timepoints)
+    lickrate_interp = _get_interpolated_lickrate(exp, timepoints)
+
+    finite_frame_ind = np.setdiff1d(range(len(running_interp)), nan_frame_ind)
+    running_interp_finite_frame = running_interp[finite_frame_ind]
+    pupil_interp_finite_frame = pupil_interp[finite_frame_ind]
+    lickrate_interp_finite_frame = lickrate_interp[finite_frame_ind]
+
+    return trace_array, trace_array_std, running_interp_finite_frame, pupil_interp_finite_frame, lickrate_interp_finite_frame, remove_ind

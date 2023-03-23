@@ -650,3 +650,63 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
         temp_df.sort_index(inplace=True)
         trace_df = pd.concat([trace_df, temp_df])
     return trace_df
+
+
+def get_concatenated_mean_response_df_from_response_df(response_df, csid_list=None):
+    non_auto_rewarded_response_df = response_df.query('auto_rewarded == False')
+    change_response_df = non_auto_rewarded_response_df.query('is_change==True and auto_rewarded == False')
+    change_response_df['trace_norm'] = change_response_df.apply(lambda x: x.trace - x.trace[0], axis=1)
+    image_response_df = non_auto_rewarded_response_df.query('n_after_change > 3 and (n_after_omission > 3 or n_after_omission < 0)')
+    image_response_df['trace_norm'] = image_response_df.apply(lambda x: x.trace - x.trace[0], axis=1)
+    omission_response_df = non_auto_rewarded_response_df.query('omitted==True')
+    omission_response_df['trace_norm'] = omission_response_df.apply(lambda x: x.trace - x.trace[0], axis=1)
+
+    cell_specimen_ids = np.sort(response_df.cell_specimen_id.unique())
+    temp_df = response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').mean()
+    assert (temp_df.index.values - cell_specimen_ids).any() == False
+
+    trace_timestamps = response_df.trace_timestamps.values[0]
+    mean_response_change_df = pd.DataFrame({'cell_specimen_id': cell_specimen_ids})
+    mean_response_change_df['trace'] = change_response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace'])).apply(lambda x: np.nanmean(x, axis=0)).values
+    mean_response_change_df['trace_std'] = change_response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace'])).apply(lambda x: np.nanstd(x, axis=0)).values
+    mean_response_change_df['trace_norm'] = change_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanmean(x, axis=0)).values
+    mean_response_change_df['trace_std_norm'] = change_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanstd(x, axis=0)).values
+    mean_response_change_df['time_stamps'] = [trace_timestamps] * len(mean_response_change_df)
+
+    mean_response_image_df = pd.DataFrame({'cell_specimen_id': cell_specimen_ids})
+    mean_response_image_df['trace'] = image_response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace'])).apply(lambda x: np.nanmean(x, axis=0)).values
+    mean_response_image_df['trace_std'] = image_response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace'])).apply(lambda x: np.nanstd(x, axis=0)).values
+    mean_response_image_df['trace_norm'] = image_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanmean(x, axis=0)).values
+    mean_response_image_df['trace_std_norm'] = image_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanstd(x, axis=0)).values
+
+    mean_response_omission_df = pd.DataFrame({'cell_specimen_id': cell_specimen_ids})
+    mean_response_omission_df['trace'] = omission_response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace'])).apply(lambda x: np.nanmean(x, axis=0)).values
+    mean_response_omission_df['trace_std'] = omission_response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace'])).apply(lambda x: np.nanstd(x, axis=0)).values
+    mean_response_omission_df['trace_norm'] = omission_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanmean(x, axis=0)).values
+    mean_response_omission_df['trace_std_norm'] = omission_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanstd(x, axis=0)).values
+
+    assert (mean_response_change_df.index.values - mean_response_image_df.index.values).any() == False
+    assert (mean_response_change_df.index.values - mean_response_omission_df.index.values).any() == False
+
+    concat_mean_trace = np.hstack([np.vstack(mean_response_change_df.trace.values), np.vstack(mean_response_image_df.trace.values), np.vstack(mean_response_omission_df.trace.values)])
+    concat_mean_trace_norm = np.hstack([np.vstack(mean_response_change_df.trace_norm.values), np.vstack(mean_response_image_df.trace_norm.values), np.vstack(mean_response_omission_df.trace_norm.values)])
+    concat_std_trace = np.hstack([np.vstack(mean_response_change_df.trace_std.values), np.vstack(mean_response_image_df.trace_std.values), np.vstack(mean_response_omission_df.trace_std.values)])
+    concat_std_trace_norm = np.hstack([np.vstack(mean_response_change_df.trace_std_norm.values), np.vstack(mean_response_image_df.trace_std_norm.values), np.vstack(mean_response_omission_df.trace_std_norm.values)])
+
+    max_timestamp = np.max(trace_timestamps)
+    timestamp_interval = np.diff(trace_timestamps)[0]
+    concat_timeseries = np.hstack([trace_timestamps, trace_timestamps + max_timestamp + timestamp_interval, trace_timestamps + 2 * max_timestamp + 2 * timestamp_interval])
+    assert len(np.where(np.diff(np.unique(np.diff(concat_timeseries))) > 1e-5)[0]) == 0
+
+    concat_trace_df = pd.DataFrame({'cell_specimen_id': cell_specimen_ids,
+                                    'trace': list(concat_mean_trace),
+                                    'trace_std': list(concat_std_trace),
+                                    'trace_norm': list(concat_mean_trace_norm),
+                                    'trace_std_norm': list(concat_std_trace_norm),
+                                    'time_stamps': [concat_timeseries] * len(cell_specimen_ids)})
+    
+    concat_trace_df = concat_trace_df.set_index('cell_specimen_id')
+    if csid_list is not None:
+        concat_trace_df = concat_trace_df.loc[csid_list]
+
+    return concat_trace_df
