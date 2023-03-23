@@ -261,16 +261,20 @@ def get_non_auto_rewarded_start_end_times(stim_df):
         A list of stop times of non-auto-rewarded stimuli
     """
     auto_rewarded_inds = np.where(stim_df.auto_rewarded == True)[0]  # noqa: E712
-    diff_ar_inds = np.diff(auto_rewarded_inds)
-    skip_ar_inds = np.where(diff_ar_inds > 1)[0]
-    start_times = []  # inclusive
-    stop_times = []  # inclusive
-    for skip_ar_ind in skip_ar_inds:
-        start_times.append(stim_df.iloc[auto_rewarded_inds[skip_ar_ind] + 1].start_time)  # removing those before the first auto-rewarded stim
-        stop_times.append(stim_df.iloc[auto_rewarded_inds[skip_ar_ind + 1]].stop_time)
-    if auto_rewarded_inds[-1] != len(stim_df) - 1:  # When the last stimulus was not auto-rewarded, add the segments after the last auto-rewarded stim till the last stim
-        start_times.append(stim_df.iloc[auto_rewarded_inds[-1] + 1].start_time)
-        stop_times.append(stim_df.iloc[-1].stop_time)
+    if len(auto_rewarded_inds) > 0:
+        diff_ar_inds = np.diff(auto_rewarded_inds)
+        skip_ar_inds = np.where(diff_ar_inds > 1)[0]
+        start_times = []  # inclusive
+        stop_times = []  # inclusive
+        for skip_ar_ind in skip_ar_inds:
+            start_times.append(stim_df.iloc[auto_rewarded_inds[skip_ar_ind] + 1].start_time)  # removing those before the first auto-rewarded stim
+            stop_times.append(stim_df.iloc[auto_rewarded_inds[skip_ar_ind + 1]].stop_time)
+        if auto_rewarded_inds[-1] != len(stim_df) - 1:  # When the last stimulus was not auto-rewarded, add the segments after the last auto-rewarded stim till the last stim
+            start_times.append(stim_df.iloc[auto_rewarded_inds[-1] + 1].start_time)
+            stop_times.append(stim_df.iloc[-1].stop_time)
+    else:
+        start_times = [stim_df.iloc[0].start_time]
+        stop_times = [stim_df.iloc[-1].stop_time]
     return start_times, stop_times
 
 

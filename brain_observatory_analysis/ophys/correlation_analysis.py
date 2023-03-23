@@ -24,14 +24,10 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
             print(f"Removing {num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
             remove_ind = ind_many_nan_frames
             trace_array = np.delete(trace_array, remove_ind, axis=0)
-            trace_df = trace_df.reset_index()
-            trace_df = trace_df.drop(trace_df.index[remove_ind])
-            trace_df = trace_df.set_index('cell_specimen_id')
-
             nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
             num_nan_frames = len(nan_frames)
-            trace_array = np.delete(trace_array, nan_frames, axis=1)
             print(f"Removing {num_nan_frames} frames with nan values")
+            trace_array = np.delete(trace_array, nan_frames, axis=1)
     else:
         print(f"Removing {num_nan_frames} frames with nan values")
         trace_array = np.delete(trace_array, nan_frames, axis=1)
