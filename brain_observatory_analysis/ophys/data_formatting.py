@@ -432,11 +432,14 @@ def get_event_annotated_response_df(exp, event_type, data_type='dff', image_orde
     response_df: pandas.DataFrame
         A dataframe containing stimulus presentations with event annotations
     """
-    response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, event_type=event_type, image_order=image_order,
-                                                           time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate)
-    stim_df = get_all_annotated_stimulus_presentations(exp)
-    response_df = response_df.merge(stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
-    response_df['oeid'] = exp.ophys_experiment_id
+    if exp.cell_specimen_table.index.unique()[0] is not None:
+        response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, event_type=event_type, image_order=image_order,
+                                                            time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate)
+        stim_df = get_all_annotated_stimulus_presentations(exp)
+        response_df = response_df.merge(stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
+        response_df['oeid'] = exp.ophys_experiment_id
+    else:
+        response_df = None
 
     return response_df
 
@@ -546,7 +549,9 @@ def get_all_annotated_session_response_df(expt_group, session_name, inter_image_
     response_df = pd.DataFrame()
     for oeid in oeids:
         exp = expt_group.experiments[oeid]
-        response_df = response_df.append(get_event_annotated_response_df(exp, event_type='all', inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate))
+        temp_df = get_event_annotated_response_df(exp, event_type='all', inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
+        if temp_df is not None:
+            response_df = response_df.append(temp_df)
     return response_df
 
 
