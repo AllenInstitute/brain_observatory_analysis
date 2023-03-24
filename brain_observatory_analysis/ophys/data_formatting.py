@@ -81,7 +81,7 @@ def get_trace_df_all(expt_group, session_name, trace_type='dff', column_names=No
         dataframe of all traces from a session
     
     """
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name==session_name].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
     if column_names is None:
         column_names = _default_column_names()
     column_base_names = _default_column_base_names()
@@ -138,7 +138,7 @@ def get_trace_df_no_task(expt_group, session_name, trace_type='dff', column_name
         dataframe of traces from fingerprint (movie-watching; 30 sec 10 iterations) imaging at the end
     """
     gray_period = 5 * 60  # 5 minutes
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name==session_name].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
     stim_df = data_formatting.annotate_stimuli(expt_group.experiments[oeids[0]])  # First experiment represents the session stimulus presentations
     
     # Match the # of indices from each experiment
@@ -336,7 +336,7 @@ def get_trace_df_task(expt_group, session_name, remove_auto_rewarded=True, colum
         A dataframe containing trace information during the whole task
     """
     
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name==session_name].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
     stim_df = data_formatting.annotate_stimuli(expt_group.experiments[oeids[0]])  # First experiment represents the session stimulus presentations
     # Only works on old allensdk version (or lamf_hacks branch of MJD's fork)
     # TODO: when using updated version of allensdk (>2.13.6), change the code accordingly:
@@ -474,7 +474,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
         A dataframe containing traces for a given session and event type
     """
 
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name==session_name].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
     # Set the column names
     if column_names is None:
         column_names = _default_column_names()
@@ -545,7 +545,8 @@ def get_all_annotated_session_response_df(expt_group, session_name, inter_image_
     response_df: pandas DataFrame
         DataFrame with stimulus presentations for all experiments in a session
     """
-    oeids = np.sort(expt_group.expt_table.query('session_name==@session_name').index.values)
+    
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
     response_df = pd.DataFrame()
     for oeid in oeids:
         exp = expt_group.experiments[oeid]
