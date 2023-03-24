@@ -23,14 +23,13 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
         else:
             print(f"Removing {num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
             remove_ind = ind_many_nan_frames
-            trace_array = np.delete(trace_array, remove_ind, axis=0)
-            nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
+            valid_trace_array = np.delete(trace_array, remove_ind, axis=0)
+            nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0)>0)[0]
             num_nan_frames = len(nan_frames)
             print(f"Removing {num_nan_frames} frames with nan values")
-            trace_array = np.delete(trace_array, nan_frames, axis=1)
     else:
         print(f"Removing {num_nan_frames} frames with nan values")
-        trace_array = np.delete(trace_array, nan_frames, axis=1)
+        
     return trace_array, remove_ind, nan_frames
 
 
@@ -66,8 +65,10 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     remove_ind: np.ndarray (1d)
         Indices of cells to be removed due to large number of nan frames
     """
-    trace_array, remove_ind, _ = get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold, nan_cell_prop_threshold)
-    
+    trace_array, remove_ind, nan_frame_ind = get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold, nan_cell_prop_threshold)
+    trace_array = np.delete(trace_array, remove_ind, axis=0)
+    trace_array = np.delete(trace_array, nan_frame_ind, axis=1)
+
     corr = np.corrcoef(trace_array)
 
     # sort by global mean correlation
