@@ -124,3 +124,13 @@ def get_motion_correction_crop_xy_range(oeid):
     range_x = [-min_x, -max_x]
 
     return range_y, range_x
+
+def save_figure(fig, figsize, save_dir, folder, fig_title, formats=['.png', '.pdf']):
+    fig_dir = os.path.join(save_dir, folder)
+    if not os.path.exists(fig_dir):
+        os.mkdir(fig_dir)
+    filename = os.path.join(fig_dir, fig_title)
+    mpl.rcParams['pdf.fonttype'] = 42
+    fig.set_size_inches(figsize)
+    for f in formats:
+        fig.savefig(filename + f, transparent=True, orientation='landscape', bbox_inches='tight', dpi=300, facecolor=fig.get_facecolor())
