@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Union
 import mindscope_qc.data_access.from_lims as from_lims
 from tifffile import TiffWriter
+import matplotlib as mpl
 
 ########################################################################
 # Image outputs
