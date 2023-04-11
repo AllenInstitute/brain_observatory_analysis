@@ -3,11 +3,11 @@ import pandas as pd
 from pathlib import Path
 from typing import Union
 
-from mindscope_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
+from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 # TODO: change to brain_observatory utilities
-from mindscope_utilities.visual_behavior_ophys.data_formatting import get_stimulus_response_df
+from brain_observatory_utilities.datasets.optical_physiology.data_formatting import get_stimulus_response_df
 
 from .experiment_group import ExperimentGroup
 
