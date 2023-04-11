@@ -30,7 +30,10 @@ def dateformat(exp_date):
     """
     from datetime import datetime
     if exp_date is not str:
-        exp_date = str(exp_date)[:-3]  # remove 3 zeros from seconds, otherwise the str is too long
+        if len(str(exp_date)) == 26:
+            exp_date = str(exp_date)[:-3]  # remove 3 zeros from seconds, otherwise the str is too long
+        else:
+            exp_date = str(exp_date)
     date = int(datetime.strptime(exp_date, '%Y-%m-%d  %H:%M:%S.%f').strftime('%Y%m%d'))
     return date
 
@@ -40,7 +43,10 @@ def add_date_string(df):
     Adds a new column called "date" that is a string version of the date_of_acquisition column,
     with the format year-month-date, such as 20210921
     """
-    df['date'] = df['date_of_acquisition'].apply(dateformat)
+    if 'date_string' in df:
+        df['date']=df['date_string'] 
+    else:
+        df['date'] = df['date_of_acquisition'].apply(dateformat)
     return df
 
 
