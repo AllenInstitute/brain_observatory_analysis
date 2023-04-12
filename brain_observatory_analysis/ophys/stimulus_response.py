@@ -54,7 +54,7 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
             mdfs.append(mdf)
         except Exception as e:
             print(f"Failed to get stim response for: {expt_id}, {e}")
-
+    print('Found {} stim responses df'.format(len(mdfs))) 
     mdfs = pd.concat(mdfs).reset_index(drop=True)
 
     # cells_filtered has expt_table info that is useful
@@ -78,7 +78,8 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                               output_sampling_rate: float = 10.7,
                               save_to_file: bool = False,
                               load_from_file: bool = False,
-                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"):
+                              cache_dir: Union[str, Path] = '//allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df'):
+                              # "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"):
     """Helper function for get_stimulus_response_df
 
     Parameters
