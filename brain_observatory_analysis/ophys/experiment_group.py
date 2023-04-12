@@ -41,7 +41,6 @@ class ExperimentGroup():
                  test_mode: bool = False):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
-        self.expt_list_to_load = self.expt_table_to_load.index.tolist()
         self.filters = filters
         self.test_mode = test_mode
         self.expt_list = []  # set after loading
@@ -60,6 +59,8 @@ class ExperimentGroup():
         if self.expt_table_to_load is None:
             self.expt_table_to_load = start_lamf_analysis()
             # TODO: change default or allow options
+        
+        self.expt_list_to_load = self.expt_table_to_load.index.tolist()
 
     def load_experiments(self):
         if self.test_mode:
