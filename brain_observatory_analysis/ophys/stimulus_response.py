@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from typing import Union
+import json
+import datetime
 
 from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
@@ -11,9 +13,16 @@ from brain_observatory_utilities.datasets.optical_physiology.data_formatting imp
 
 from .experiment_group import ExperimentGroup
 
+from brain_observatory_analysis.behavior.change_detection.data_wrangling.extended_stimulus_presentations import get_extended_stimulus_presentations
+
+import hashlib
+
+import pickle
+
 
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           event_type: str = "changes",
+                                          data_type: str = "dff",
                                           load_from_file: bool = True) -> pd.DataFrame:
     """
     Get mean stimulus response for each cell in the experiment group
@@ -43,14 +52,27 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
 
     mdfs = []
     for expt_id, expt in expt_group.experiments.items():
-        try:
-            sdf = _get_stimulus_response_df(expt, event_type=event_type,
-                                            load_from_file=load_from_file,
-                                            save_to_file=False)
+        try:    
 
+            # TODO: MOVE TO DEV
+            expt.extended_stimulus_presentations = \
+                get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
+                                                    expt.licks,
+                                                    expt.rewards,
+                                                    expt.running_speed,
+                                                    expt.eye_tracking)
+
+            sdf = _get_stimulus_response_df(expt,
+                                            event_type=event_type,
+                                            data_type=data_type,
+                                            load_from_file=load_from_file,
+                                            save_to_file=True)
+            
+            sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
             mdf = get_standard_mean_df(sdf)
             mdf["ophys_experiment_id"] = expt_id
             mdf["event_type"] = event_type
+            mdf["data_type"] = data_type
             mdfs.append(mdf)
         except Exception as e:
             print(f"Failed to get stim response for: {expt_id}, {e}")
@@ -75,6 +97,7 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
 
 def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, BehaviorOphysExperimentDev],
                               event_type: str = 'changes',
+                              data_type: str = "dff",
                               output_sampling_rate: float = 10.7,
                               save_to_file: bool = False,
                               load_from_file: bool = False,
@@ -125,19 +148,61 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
     # frame_rate = experiment.metadata["ophys_frame_rate"]
 
     try:
-        fn = f"{expt_id}_{event_type}.pkl"
+
+        # may implement later, using unique filenames
+        # now = datetime.datetime.now()
+        # dt_string = now.strftime("%d_%m_%Y_%H_%M_%S")
+        # base_fn = f"{expt_id}_{data_type}_{event_type}.pkl"
+        # unique_fn = f"{dt_string}_{base_fn}"
+        base_fn = f"{expt_id}_{data_type}_{event_type}"
+        fn = f"{base_fn}.pkl"
+
         if (cache_dir / fn).exists() and load_from_file:
             sdf = pd.read_pickle(cache_dir / fn)
             print(f"Loading stim response df for {expt_id} from file")
         else:
+            # generally don't need to change
+            time_window = [-3, 3]
+            response_window_duration = 0.5
+            interpolate = True
+
             sdf = get_stimulus_response_df(experiment,
                                            event_type=event_type,
+                                           data_type=data_type,
+                                           time_window=time_window,
+                                           response_window_duration=response_window_duration,
+                                           interpolate=interpolate,
                                            output_sampling_rate=output_sampling_rate)
             if save_to_file:
+                # gather all inputs into params dict
+                func_params = {"event_type": event_type,
+                               "data_type": data_type,
+                               "output_sampling_rate": output_sampling_rate,
+                               "time_window": time_window,
+                               "response_window_duration": response_window_duration,
+                               "interpolate": interpolate
+                               }
+                
+                # save dff has to see if anything changes later
+                data_verify = {# "cell_specimen_id": experiment.cell_specimen_table.index.values,
+                               # "cell_roi_id": experiment.cell_specimen_table["cell_roi_id"].values,
+                               "dff_hash": hashlib.sha256(pickle.dumps(experiment.dff_traces.values)).hexdigest()}
+
+                params = {"experiment_id": expt_id,
+                          "data_verify": data_verify,
+                          "function": "_get_stimulus_response_df",
+                          "function_params": func_params}
+                
                 if (cache_dir / fn).exists():
                     print(f"Overwriting stim response df for {expt_id} in file")
                 sdf.to_pickle(cache_dir / fn)
                 print(f"Saving stim response df for {expt_id} to file")
+
+                params["stimulus_response_df_path"] = str(cache_dir / fn)
+
+                # save params to file
+                with open(cache_dir / f"{base_fn}_params.json", "w") as f:
+                    json.dump(params, f)
         return sdf
     except Exception as e:
         print(f"Failed to get stim response for: {expt_id}, {e}")
@@ -149,28 +214,38 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
 ####################################################################################################
 
 # TODO: clean + document
-def get_standard_mean_df(df):
+def get_standard_mean_df(sr_df):
     time_window = [-3, 3.1]
     output_sampling_rate = 10.7
     get_pref_stim = False  # relevant to image_name conditions
+    exclude_omitted_from_pref_stim = True  # relevant to image_name conditions  
 
-    if "response_window_duration" in df.keys():
-        response_window_duration = df.response_window_duration.values[0]
+    if "response_window_duration" in sr_df.keys():
+        response_window_duration = sr_df.response_window_duration.values[0]
 
-    output_sampling_rate = df.ophys_frame_rate.unique()[0]
+    output_sampling_rate = sr_df.ophys_frame_rate.unique()[0]
     conditions = ["cell_roi_id"]
-    mdf = get_mean_df(df, conditions=conditions,
+
+    if get_pref_stim:
+        # options for groupby "change_image_name", "image_name", "prior_image_name"
+        # conditions.append('change_image_name')
+        conditions.append('image_name')
+    mdf = get_mean_df(sr_df,
+                      conditions=conditions,
                       frame_rate=output_sampling_rate,
                       window_around_timepoint_seconds=time_window,
                       response_window_duration_seconds=response_window_duration,
                       get_pref_stim=get_pref_stim,
-                      exclude_omitted_from_pref_stim=True)
+                      exclude_omitted_from_pref_stim=exclude_omitted_from_pref_stim)
+
+    # annotate with stimulus info
+
     return mdf
 
 
 # TODO: clean + document
 def get_mean_df(stim_response_df: pd.DataFrame,
-                conditions=['cell', 'change_image_name'],
+                conditions=['cell_roi_id', 'image_name'],
                 frame_rate=11.0,
                 window_around_timepoint_seconds: list = [-3, 3],
                 response_window_duration_seconds: float = 0.5,
@@ -189,7 +264,6 @@ def get_mean_df(stim_response_df: pd.DataFrame,
     response_window_duration = response_window_duration_seconds
 
     rdf = stim_response_df.copy()
-
     mdf = rdf.groupby(conditions).apply(get_mean_sem_trace)
     mdf = mdf[['mean_response', 'sem_response', 'mean_trace', 'sem_trace',
                'trace_timestamps', 'mean_responses', 'mean_baseline', 'sem_baseline']]
@@ -201,6 +275,7 @@ def get_mean_df(stim_response_df: pd.DataFrame,
         if ('image_name' in conditions) or ('change_image_name' in conditions) or ('prior_image_name' in conditions):
             mdf = annotate_mean_df_with_pref_stim(
                 mdf, exclude_omitted_from_pref_stim)
+            print(mdf)
 
     try:
         mdf = annotate_mean_df_with_fano_factor(mdf)
@@ -516,7 +591,7 @@ def annotate_mean_df_with_pref_stim(mean_df, exclude_omitted_from_pref_stim=True
     if 'cell_specimen_id' in mdf.keys():
         cell_key = 'cell_specimen_id'
     else:
-        cell_key = 'cell'
+        cell_key = 'cell_roi_id'
     for cell in mdf[cell_key].unique():
         mc = mdf[(mdf[cell_key] == cell)]
         if exclude_omitted_from_pref_stim:

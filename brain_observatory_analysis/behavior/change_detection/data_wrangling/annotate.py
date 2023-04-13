@@ -1,0 +1,899 @@
+import numpy as np
+import os
+import warnings
+import pandas as pd
+from six import iteritems
+from dateutil import parser
+from .utils import inplace
+
+
+####################################################################################################
+# Licks dataframe
+####################################################################################################
+
+def annotate_licks(dataObject=None,
+                   licks_df: pd.DataFrame = None,
+                   rewards_df: pd.DataFrame = None,
+                   inplace=False,
+                   lick_bout_ili=0.7):
+    '''Annotates licks dataframe with lick and lick bout information
+
+    Parameters
+    ----------
+    dataObject : BehaviorSession, BehaviorOphysSession object from SDK
+        OR ChangeDetectionDataset object from brain_observatory_analysis
+    licks_df : pd.DataFrame, optional
+        licks dataframe, by default None. Can supply instead of dataObject
+    rewards_df : pd.DataFrame
+        rewards dataframe, by default None. Can supply instead of dataObject
+    inplace : bool, optional
+        whether to operate in place, by default False
+    lick_bout_ili : float, optional
+        interval between licks required to label a lick as the start/end of a licking bout, by default 0.7
+
+    Returns
+    -------
+    pd.DataFrame
+        licks dataframe with additional columns
+
+
+    Notes
+    -----
+    Added columns:
+    pre_ili (float): time without any licks before current lick
+    post_ili (float): time without any licks after current lick
+    bout_start (boolean): True if licks is first in bout, False otherwise
+    bout_end (boolean): True if licks is last in bout, False otherwise
+    licks_in_bout (int): Number of licks in current lick bout
+    lick_bout_number (int): A count of the number of discrete lick bouts. All licks in a given bout share a value
+    bout_rewarded (bool): True if a reward was delivered within the current bout
+    hit (bool): True if the lick was a hit lick (lick that triggered a reward)
+
+    '''
+    if dataObject is None:
+        assert licks_df is not None and rewards_df is not None, "Must supply either dataObject or licks_df and rewards_df"
+
+    # if dataObject is supplied, get licks_df and rewards_df from it
+    if dataObject is not None:
+        licks_df = dataObject.licks
+        rewards_df = dataObject.rewards
+
+    licks_df['pre_ili'] = licks_df['time'] - licks_df['time'].shift(fill_value=0)
+    licks_df['post_ili'] = licks_df['time'].shift(periods=-1, fill_value=np.inf) - licks_df['time']
+    licks_df['bout_start'] = licks_df['pre_ili'] > lick_bout_ili
+
+    licks_df['bout_end'] = licks_df['post_ili'] > lick_bout_ili
+
+    # 1st lick always start of bout (fix super early lick bug)
+    # Still leaves open 0 frame licks, possible hardware bug 637762
+    licks_df.loc[0, "bout_start"] = True 
+
+    # count licks in every bout, add a lick bout number
+    licks_df['licks_in_bout'] = np.nan
+    licks_df['lick_bout_number'] = np.nan
+    licks_df['bout_rewarded'] = np.nan
+    lick_bout_number = 0
+    for bout_start_index, row in licks_df.query('bout_start').iterrows():
+        bout_end_index = licks_df.iloc[bout_start_index:].query('bout_end').index[0]
+        licks_df.at[bout_start_index, 'licks_in_bout'] = bout_end_index - bout_start_index + 1
+
+        licks_df.at[bout_start_index, 'lick_bout_number'] = lick_bout_number
+        lick_bout_number += 1
+
+        bout_start_time = licks_df.loc[bout_start_index]['time']  # NOQA F841
+        bout_end_time = licks_df.loc[bout_end_index]['time']  # NOQA F841
+
+        query = 'time >= @bout_start_time and time <= @bout_end_time'
+        licks_df.at[bout_start_index, 'bout_rewarded'] = float(len(rewards_df.query(query)) >= 1)
+
+    licks_df['licks_in_bout'] = licks_df['licks_in_bout'].fillna(method='ffill').astype(int)
+    licks_df['lick_bout_number'] = licks_df['lick_bout_number'].fillna(method='ffill').astype(int)
+    licks_df['bout_rewarded'] = licks_df['bout_rewarded'].fillna(method='ffill').astype(bool)
+
+    # add a column that designates hit licks (lick that triggers reward)
+    licks_df['hit'] = False
+    licks_df.loc[licks_df.query('bout_rewarded').drop_duplicates(subset='lick_bout_number').index, 'hit'] = True
+
+    if inplace is False:
+        return licks_df
+
+
+####################################################################################################
+# Trials DataFrame
+####################################################################################################
+
+
+def _infer_last_trial_frame(trials_df, visual_stimuli):
+    """attempts to infer the last frame index of the trials_df
+
+    Parameters
+    ----------
+    trials_df : `pd.Dataframe`
+        core trials_df dataframe
+    visual_stimuli : `pd.Dataframe`
+        core visual stimuli dataframe
+
+    Returns
+    -------
+    int or None
+        last frame index of the last trial
+
+    Notes
+    -----
+    - this is meant to address issue #482 with `make_trials_contiguous` which
+    assumed that the last experiment frame would be a trial frame but breaks for
+    experiments where the last frame is a movie frame or grayscreen
+    """
+    last_trial_end_frame = (trials_df.iloc[-1]).endframe
+    filtered_vs = visual_stimuli[visual_stimuli.frame >= last_trial_end_frame]
+
+    if len(filtered_vs.index) > 0:
+        return (filtered_vs.iloc[0]).frame
+
+
+@inplace
+def make_trials_contiguous(trials_df, time, visual_stimuli=None):
+    if visual_stimuli is not None:
+        trial_end_frame = _infer_last_trial_frame(trials_df, visual_stimuli, )
+    else:
+        trial_end_frame = None
+
+    if trial_end_frame is None:
+        trial_end_frame = len(time) - 1
+
+    trial_end_frame = min(trial_end_frame, len(time) - 1)  # ensure that trial end frame doesn't exceed length of time vector
+
+    trial_end_time = time[trial_end_frame]
+
+    trials_df['endframe'] = trials_df['startframe'] \
+        .shift(-1) \
+        .fillna(trial_end_frame) \
+        .astype(int)
+    trials_df['endtime'] = trials_df['starttime'] \
+        .shift(-1) \
+        .fillna(trial_end_time)
+    trials_df['trial_length'] = trials_df['endtime'] - trials_df['starttime']
+
+
+@inplace
+def annotate_parameters(trials_df, metadata, keydict=None):
+    """ annotates a dataframe with session parameters
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df (or flashes)
+    data : unpickled session
+    keydict : dict
+        {'column': 'parameter'}
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials_df
+    io.load_flashes
+    """
+    if keydict is None:
+        return None
+    else:
+        for key, value in iteritems(keydict):
+            try:
+                trials_df[key] = [metadata[value]] * len(trials_df)
+            except KeyError:
+                trials_df[key] = None
+
+
+@inplace
+def explode_startdatetime(df):
+    """ explodes the 'startdatetime' column into date/year/month/day/hour/dayofweek
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df (or flashes)
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials_df
+    """
+    df['date'] = df['startdatetime'].dt.date
+    df['year'] = df['startdatetime'].dt.year
+    df['month'] = df['startdatetime'].dt.month
+    df['day'] = df['startdatetime'].dt.day
+    df['hour'] = df['startdatetime'].dt.hour
+    df['dayofweek'] = df['startdatetime'].dt.weekday
+
+
+@inplace
+def annotate_n_rewards(df):
+    """ computes the number of rewards from the 'reward_times' column
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    try:
+        df['number_of_rewards'] = df['reward_times'].map(len)
+    except KeyError:
+        df['number_of_rewards'] = None
+
+
+# @inplace
+# def annotate_rig_id(trials_df, metadata):
+#     """ adds a column with rig id
+
+#     Parameters
+#     ----------
+#     trials_df : pandas DataFrame
+#         dataframe of trials_df
+#     inplace : bool, optional
+#         modify `trials_df` in place. if False, returns a copy. default: True
+
+#     See Also
+#     --------
+#     io.load_trials
+#     """
+#     try:
+#         trials_df['rig_id'] = metadata['rig_id']
+#     except KeyError:
+#         from visual_behavior.devices import get_rig_id
+#         trials_df['rig_id'] = get_rig_id(trials_df['computer_name'][0])
+
+
+@inplace
+def annotate_startdatetime(trials_df, metadata):
+    """ adds a column with the session's `startdatetime`
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    data : pickled session
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    trials_df['startdatetime'] = parser.parse(metadata['startdatetime'])
+
+
+@inplace
+def assign_session_id(trials_df):
+    """ adds a column with a unique ID for the session defined as
+            a combination of the mouse ID and startdatetime
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    trials_df['session_id'] = trials_df['mouse_id'] + '_' + trials_df['startdatetime'].map(lambda x: x.isoformat())
+
+
+@inplace
+def annotate_cumulative_reward(trials_df, metadata):
+    """ adds a column with the session's cumulative volume
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    data : pickled session
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials_df
+    """
+    try:
+        trials_df['cumulative_volume'] = trials_df['reward_volume'].cumsum()
+    except Exception:
+        trials_df['reward_volume'] = metadata['rewardvol'] * trials_df['number_of_rewards']
+        trials_df['cumulative_volume'] = trials_df['reward_volume'].cumsum()
+
+
+@inplace
+def annotate_filename(df, filename):
+    """ adds `filename` and `filepath` columns to dataframe
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    filename : full filename & path of session's pickle file
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials_df
+    """
+    df['filepath'] = os.path.split(filename)[0]
+    df['filename'] = os.path.split(filename)[-1]
+
+
+@inplace
+def fix_autorewarded(df):
+    """ renames `auto_rearded` columns to `auto_rewarded`
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    df.rename(columns={'auto_rearded': 'auto_rewarded'}, inplace=True)
+
+
+@inplace
+def annotate_change_detect(trials_df):
+    """ adds `change` and `detect` columns to dataframe
+
+    Parameters
+    ----------
+    trials_df : pandas DataFrame
+        dataframe of trials_df
+    inplace : bool, optional
+        modify `trials_df` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials_df
+    """
+
+    trials_df['change'] = trials_df['trial_type'] == 'go'
+    trials_df['detect'] = trials_df['response'] == 1.0
+
+
+@inplace
+def fix_change_time(trials):
+    """ forces `None` values in the `change_time` column to numpy NaN
+
+    Parameters
+    ----------
+    trials : pandas DataFrame
+        dataframe of trials
+    inplace : bool, optional
+        modify `trials` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    trials['change_time'] = trials['change_time'].map(lambda x: np.nan if x is None else x)
+
+
+@inplace
+def explode_response_window(trials):
+    """ explodes the `response_window` column in lower & upper columns
+
+    Parameters
+    ----------
+    trials : pandas DataFrame
+        dataframe of trials
+    inplace : bool, optional
+        modify `trials` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    trials['response_window_lower'] = trials['response_window'].map(lambda x: x[0])
+    trials['response_window_upper'] = trials['response_window'].map(lambda x: x[1])
+
+
+@inplace
+def annotate_epochs(trials, epoch_length=5.0, adjust_first_trial=True):
+    """ annotates the dataframe with an additional column which designates
+    the "epoch" from session start
+
+    Parameters
+    ----------
+    trials : pandas DataFrame
+        dataframe of trials
+    epoch_length : float
+        length of epochs in seconds
+    adjust_first_trial : boolean
+        subtracts first trial time from every trial to account for delay in first trial time
+        (for example, if session is preceded by 5 minutes of gray time, there would be no trials in the first 5 minute epoch.
+        this adjustment would shift the first trial from 5 minutes to 0 minutes)
+    inplace : bool, optional
+        modify `trials` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+
+    assert trials.index.is_unique, "input dataframe must have unique indices"
+
+    for uuid in trials.behavior_session_uuid.unique():
+        df_slice = trials.query('behavior_session_uuid == @uuid')
+        indices = df_slice.index
+
+        if adjust_first_trial:
+            trials.loc[indices, 'start_time_epoch_adjusted'] = df_slice['starttime'] - df_slice['starttime'].min()
+        else:
+            trials[indices, 'start_time_epoch_adjusted'] = df_slice['starttime']
+
+        epoch = (
+            trials.loc[indices, 'start_time_epoch_adjusted']
+            .map(lambda x: x / (60.0 * epoch_length))
+            .map(np.floor)
+            .map(lambda x: x * epoch_length)
+            # .map(lambda x: "{:0.1f} min".format(x))
+        )
+        trials.loc[indices, 'epoch'] = epoch
+
+
+@inplace
+def annotate_lick_vigor(trials, licks, window=5):
+    """ annotates the dataframe with two columns that indicate the number of
+    licks and lick rate in 1/s
+
+    Parameters
+    ----------
+    trials : pandas DataFrame
+        dataframe of trials
+    window : window relative to reward time for licks to include
+    inplace : bool, optional
+        modify `trials` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+
+    def find_licks(reward_times):
+        try:
+            reward_time = reward_times[0]
+        except IndexError:
+            return []
+
+        reward_lick_mask = (
+            (licks['time'] > reward_time)
+            & (licks['time'] < (reward_time + window))
+        )
+
+        tr_licks = licks[reward_lick_mask].copy()
+        tr_licks['time'] -= reward_time
+        return tr_licks['time'].values
+
+    def number_of_licks(licks):
+        return len(licks)
+
+    trials['reward_licks'] = trials['reward_times'].map(find_licks)
+    trials['reward_lick_count'] = trials['reward_licks'].map(lambda lks: len(lks) if lks is not None else None)
+    # trials['reward_lick_rate'] = trials['reward_lick_number'].map(lambda n: n / window)
+
+    def min_licks(lks):
+        if lks is None:
+            return None
+        elif len(lks) == 0:
+            return None
+        else:
+            return np.min(lks)
+
+    trials['reward_lick_latency'] = trials['reward_licks'].map(min_licks)
+
+
+@inplace
+def annotate_trials(trials):
+    """ performs multiple annotatations:
+
+    - annotate_change_detect
+    - fix_change_time
+    - explode_response_window
+
+    Parameters
+    ----------
+    trials : pandas DataFrame
+        dataframe of trials
+    inplace : bool, optional
+        modify `trials` in place. if False, returns a copy. default: True
+
+    See Also
+    --------
+    io.load_trials
+    """
+    # build arrays for change detection
+    annotate_change_detect(trials, inplace=True)
+
+    # assign a session ID to each row
+    assign_session_id(trials, inplace=True)
+
+    # calculate reaction times
+    fix_change_time(trials, inplace=True)
+
+    # unwrap the response window
+    explode_response_window(trials, inplace=True)
+
+
+@inplace
+def update_times(trials, time):
+
+    time_frame_map = {
+        'change_time': 'change_frame',
+        'starttime': 'startframe',
+        'endtime': 'endframe',
+        'lick_times': 'lick_frames',
+        'reward_times': 'reward_frames',
+    }
+
+    def update(fr):
+        try:
+            if (fr is None) or (type(fr) == float and np.isnan(fr) == True):  # this should catch np.nans
+                return None
+            else:  # this should be for floats
+                return time[int(fr)]
+        except (TypeError, ValueError):  # this should catch lists
+            return time[[int(f) for f in fr]]
+
+    for time_col, frame_col in iteritems(time_frame_map):
+        try:
+            trials[time_col] = trials[frame_col].map(update)
+        except KeyError:
+            print('oops! {} does not exist'.format(frame_col))
+            pass
+
+    def make_array(val):
+        try:
+            len(val)
+        except TypeError:
+            val = [val, ]
+        return val
+
+    must_be_arrays = ('lick_times', 'reward_times')
+    for col in must_be_arrays:
+        trials[col] = trials[col].map(make_array)
+
+
+def categorize_one_trial(tr):
+    if pd.isnull(tr['change_time']):
+        if (len(tr['lick_times']) > 0):
+            trial_type = 'aborted'
+        else:
+            trial_type = 'other'
+    else:
+        if (tr['auto_rewarded'] is True):
+            return 'autorewarded'
+
+        elif (tr['rewarded'] is True):
+            return 'go'
+
+        elif (tr['rewarded'] == 0):
+            return 'catch'
+
+        else:
+            return 'other'
+
+    return trial_type
+
+
+def categorize_trials(trials):
+    '''trial types:
+         'aborted' = lick before stimulus
+         'autorewarded' = reward autodelivered at time of stimulus
+         'go' = stimulus delivered, rewarded if lick emitted within 1 second
+         'catch' = no stimulus delivered
+         'other' = uncategorized (shouldn't be any of these, but this allows me to find trials that don't meet this conditions)
+
+         returns a series with trial types
+         '''
+    return trials.apply(categorize_one_trial, axis=1)
+
+
+def get_lick_frames(trials, licks):
+    """
+    returns a list of arrays of lick frames, with one entry per trial
+    """
+    # Note: [DRO - 1/12/18] it used to be the case that the lick sensor was polled on every frame in the stimulus code, giving
+    #      a 1:1 correspondence between the frame number and the index in the 'lickData' array. However, that assumption was
+    #      violated when we began displaying a frame at the beginning of the session without a corresponding call the 'checkLickSensor'
+    #      method. Using the 'responselog' instead will provide a more accurate measure of actual like frames and times.
+    # lick_frames = data['lickData'][0]
+
+    lick_frames = licks['frame']
+
+    local_licks = []
+    for idx, row in trials.iterrows():
+        local_licks.append(
+            lick_frames[np.logical_and(lick_frames > int(row['startframe']), lick_frames <= int(row['endframe']))]
+        )
+
+    return local_licks
+
+
+# HACK MJD
+def get_lick_bout_times(trials, licks):
+    
+    # TODO ASSERT has annotation bouts
+    #bout_times = licks.query("bout_start == True").time.to_numpy()
+    bout_times = licks.query("bout_start == True").time.reset_index(drop=True)
+
+    trial_bouts = []
+    for idx, row in trials.iterrows():
+        bouts = bout_times[np.logical_and(bout_times > row['starttime'],
+                   bout_times <= row['endtime'])].dropna()
+
+        trial_bouts.append(list(bouts.values))
+
+    return trial_bouts
+
+@inplace
+def calculate_latency(trials):
+    # For each trial, calculate the difference between each stimulus change and the next lick (response lick)
+    for idx in trials.index:
+        if pd.isnull(trials['change_time'][idx]) is False and len(trials['lick_times'][idx]) > 0:
+            licks = np.array(trials['lick_times'][idx])
+
+            post_stimulus_licks = licks - trials['change_time'][idx]
+
+            post_window_licks = post_stimulus_licks[post_stimulus_licks > trials.loc[idx]['response_window'][0]]
+
+            if len(post_window_licks) > 0:
+                trials.loc[idx, 'response_latency'] = post_window_licks[0]
+
+
+@inplace
+def calculate_reward_rate(
+        df,
+        trial_window=25,
+        remove_aborted=False
+):
+    # written by Dan Denman (stolen from http://stash.corp.alleninstitute.org/users/danield/repos/djd/browse/calculate_reward_rate.py)
+    # add a column called reward_rate to the input dataframe
+    # the reward_rate column contains a rolling average of rewards/min
+    # remove_aborted flag needs work, don't use it for now
+    reward_rate = np.zeros(np.shape(df.change_time))
+    c = 0
+    for startdatetime in df.startdatetime.unique():  # go through the dataframe by each behavior session
+        # get a dataframe for just this session
+        if remove_aborted is True:
+            warnings.warn("Don't use remove_aborted yet. Code needs work")
+            df_temp = df[(df.startdatetime == startdatetime) & (df.trial_type != 'aborted')].reset_index()
+        else:
+            df_temp = df[df.startdatetime == startdatetime]
+        trial_number = 0
+        for trial in range(len(df_temp)):
+            if trial_number < 10:  # if in first 10 trials of experiment
+                reward_rate_on_this_lap = np.inf  # make the reward rate infinite, so that you include the first trials automatically.
+            else:
+                # ensure that we don't run off the ends of our dataframe # get the correct response rate around the trial
+                min_index = np.max((0, trial - trial_window))
+                max_index = np.min((trial + trial_window, len(df_temp)))
+                df_roll = df_temp.iloc[min_index:max_index]
+                correct = len(df_roll[df_roll.response_type == 'HIT'])
+                time_elapsed = df_roll.starttime.iloc[-1] - df_roll.starttime.iloc[0]  # get the time elapsed over the trials
+                reward_rate_on_this_lap = correct / time_elapsed  # calculate the reward rate
+
+            reward_rate[c] = reward_rate_on_this_lap  # store the rolling average
+            c += 1
+            trial_number += 1  # increment some dumb counters
+    df['reward_rate'] = reward_rate * 60.  # convert to rewards/min
+
+
+def check_responses(trials, reward_window=None):
+    '''trial types:
+         'aborted' = lick before stimulus
+         'autorewarded' = reward autodelivered at time of stimulus
+         'go' = stimulus delivered, rewarded if lick emitted within 1 second
+         'catch' = no stimulus delivered
+         'other' = uncategorized (shouldn't be any of these, but this allows me to find trials that don't meet this conditions)
+
+         adds a column called 'response' to the input dataframe
+         '''
+
+    if reward_window is not None:
+        rw_low = reward_window[0]
+        rw_high = reward_window[1]
+
+    did_respond = np.zeros(len(trials))
+    for ii, idx in enumerate(trials.index):
+
+        if reward_window is None:
+            rw_low = trials.loc[idx]['response_window'][0]
+            rw_high = trials.loc[idx]['response_window'][1]
+        if pd.isnull(trials.loc[idx]['change_time']) == False and \
+                pd.isnull(trials.loc[idx]['response_latency']) == False and \
+                trials.loc[idx]['response_latency'] >= rw_low and \
+                trials.loc[idx]['response_latency'] <= rw_high:
+            did_respond[ii] = True
+
+    return did_respond
+
+
+def trial_translator(trial_type, response_type, auto_rewarded=False):
+    if trial_type == 'aborted':
+        return 'aborted'
+    elif auto_rewarded == True:
+        return 'auto_rewarded'
+    elif trial_type == 'autorewarded':
+        return 'auto_rewarded'
+    elif trial_type == 'go':
+        if response_type in ['HIT', True, 1]:
+            return 'hit'
+        else:
+            return 'miss'
+    elif trial_type == 'catch':
+        if response_type in ['FA', True, 1]:
+            return 'false_alarm'
+        else:
+            return 'correct_reject'
+
+
+def is_hit(trial):
+    '''returns:
+        True if trial is a hit
+        False if trial is a miss
+        NaN otherwise
+    '''
+    trial_description = assign_trial_description(trial)
+    if trial_description == 'hit':
+        return True
+    elif trial_description == 'miss':
+        return False
+    else:
+        return np.nan
+
+
+def is_catch(trial):
+    '''returns:
+        True if trial is a false alarm
+        False if trial is a correct rejection
+        NaN otherwise
+    '''
+    trial_description = assign_trial_description(trial)
+    if trial_description == 'false_alarm':
+        return True
+    elif trial_description == 'correct_reject':
+        return False
+    else:
+        return np.nan
+
+
+def colormap(trial_type, palette='trial_types'):
+    if palette.lower() == 'trial_types':
+        colors = {
+            'aborted': 'lightgray',
+            'auto_rewarded': 'darkblue',
+            'hit': '#55a868',
+            'miss': '#ccb974',
+            'false_alarm': '#c44e52',
+            'correct_reject': '#4c72b0',
+        }
+    else:
+        # colors = {
+        #     'aborted': 'red',
+        #     'auto_rewarded': 'blue',
+        #     'hit': 'darkgreen',
+        #     'miss': 'lightgreen',
+        #     'false_alarm': 'darkorange',
+        #     'correct_reject': 'yellow',
+        # }
+        colors = {
+            'aborted': 'red',
+            'auto_rewarded': 'blue',
+            'hit': 'green',
+            'miss': 'white',
+            'false_alarm': 'orange',
+            'correct_reject': 'yellow',
+        }
+    return colors.get(trial_type, 'white')
+
+
+def assign_trial_description(trial, palette='trial_types'):
+    return trial_translator(trial['trial_type'], trial['response'], trial['auto_rewarded'])
+
+
+def assign_color(trial, palette='trial_types'):
+
+    trial_type = trial_translator(trial['trial_type'], trial['response'])
+    return colormap(trial_type, palette)
+
+
+def get_response_type(trials):
+
+    response_type = []
+    for idx in trials.index:
+        if trials.loc[idx].trial_type.lower() == 'aborted':
+            response_type.append('EARLY_RESPONSE')
+        elif (trials.loc[idx].rewarded == True) & (trials.loc[idx].response == 1):
+            response_type.append('HIT')
+        elif (trials.loc[idx].rewarded == True) & (trials.loc[idx].response != 1):
+            response_type.append('MISS')
+        elif (trials.loc[idx].rewarded == False) & (trials.loc[idx].response == 1):
+            response_type.append('FA')
+        elif (trials.loc[idx].rewarded == False) & (trials.loc[idx].response != 1):
+            response_type.append('CR')
+        else:
+            response_type.append('other')
+
+    return response_type
+
+
+@inplace
+def remove_repeated_licks(trials):
+    """
+    the stimulus code records one lick for each frame in which the tongue was in contact with the spout
+    if a single lick spans multiple frames, it'll be recorded as multiple licks
+    this method will throw out the lick times and lick frames after the initial contact
+    """
+    lt = []
+    lf = []
+    for idx, row in trials.iterrows():
+
+        # get licks for this frame
+        lick_frames_on_this_trial = row.lick_frames
+        lick_times_on_this_trial = row.lick_times
+        if len(lick_frames_on_this_trial) > 0:
+            # use the number of frames between each lick to determine which to keep
+            if len(lick_frames_on_this_trial) > 1:
+                lick_intervals = np.hstack((np.inf, np.diff(lick_frames_on_this_trial)))
+            else:
+                lick_intervals = np.array([np.inf])
+
+            # only keep licks that are preceded by at least one frame without a lick
+            lf.append(list(np.array(lick_frames_on_this_trial)[lick_intervals > 1]))
+            lt.append(list(np.array(lick_times_on_this_trial)[lick_intervals[:len(lick_times_on_this_trial)] > 1]))
+        else:
+            lt.append([])
+            lf.append([])
+
+    # replace the appropriate rows of the dataframe
+    trials['lick_times'] = lt
+    trials['lick_frames'] = lf
+
+
+@inplace
+def near_miss(trials_df: pd.DataFrame, near_miss_window: float = 0.5):
+    """Add a column to the trials dataframe indicating whether a near
+    miss occurred, within certain time window after the end
+    of the response/reward window
+    
+    Parameters
+    ----------
+    trials_df : pd.DataFrame
+        trials dataframe
+    near_miss_window : float, optional
+        time window after the end of the response/reward window, by default 0.5 seconds
+
+    Returns
+    -------
+    None
+
+    """
+    trials_df['near_miss'] = np.nan
+    for idx, row in trials_df.iterrows():
+        if row['trial_type'] == 'go':
+            if row['response_latency'] > row['response_window'][1] and \
+                    row['response_latency'] < row['response_window'][1] + near_miss_window:
+                trials_df.loc[idx, 'near_miss'] = True
+            else:
+                trials_df.loc[idx, 'near_miss'] = False
+        else:
+            trials_df.loc[idx, 'near_miss'] = False
