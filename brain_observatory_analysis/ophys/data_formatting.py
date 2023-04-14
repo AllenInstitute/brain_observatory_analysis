@@ -103,7 +103,7 @@ def get_trace_df_all(expt_group, session_name, trace_type='dff', column_names=No
         temp_df['cell_specimen_id'] = csid
         temp_df['cell_roi_id'] = crid
         temp_df['trace'] = trace
-        temp_df['timepoints'] = expt_group.experiments[oeid].ophys_timestamps
+        temp_df['timepoints'] = [expt_group.experiments[oeid].ophys_timestamps] * len(csid)
         temp_df['oeid'] = oeid
         for cn in column_added_names:
             temp_df[cn] = expt_group.expt_table.loc[oeid, cn]
