@@ -13,7 +13,7 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
     nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
     num_nan_frames = len(nan_frames)
 
-    remove_ind = np.zeros(0,)
+    remove_ind = np.zeros(0,dtype=np.uint32)
     if num_nan_frames > num_nan_frames_threshold:
         num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
         ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
@@ -21,14 +21,14 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
         if num_nan_cells / num_cell > nan_cell_prop_threshold:
             raise ValueError(f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
         else:
-            print(f"Removing {num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
+            print(f"{num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
             remove_ind = ind_many_nan_frames
             valid_trace_array = np.delete(trace_array, remove_ind, axis=0)
             nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0)>0)[0]
             num_nan_frames = len(nan_frames)
-            print(f"Removing {num_nan_frames} frames with nan values")
+            print(f"{num_nan_frames} frames with nan values")
     else:
-        print(f"Removing {num_nan_frames} frames with nan values")
+        print(f"{num_nan_frames} frames with nan values")
         
     return trace_array, remove_ind, nan_frames
 
