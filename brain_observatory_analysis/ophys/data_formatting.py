@@ -368,21 +368,24 @@ def get_trace_df_task(expt_group, session_name, remove_auto_rewarded=True, colum
         timestamps = expt_group.experiments[oeid].ophys_timestamps
         assert len(test_dff) == len(timestamps)
 
-        test_dff_crop = np.concatenate([test_dff[msi: mei] for msi, mei in zip(max_start_inds, min_end_inds)])
-        timepoints = np.concatenate([timestamps[msi: mei] for msi, mei in zip(max_start_inds, min_end_inds)])
-        assert len(timepoints) == len(test_dff_crop)
+        try:
+            test_dff_crop = np.concatenate([test_dff[msi: mei] for msi, mei in zip(max_start_inds, min_end_inds)])
+            timepoints = np.concatenate([timestamps[msi: mei] for msi, mei in zip(max_start_inds, min_end_inds)])
+            assert len(timepoints) == len(test_dff_crop)
 
-        temp_df['cell_specimen_id'] = csid
-        temp_df['cell_roi_id'] = crid
-        temp_df['trace'] = dff_df.dff.apply(lambda x: np.concatenate([x[msi: mei] for msi, mei in zip(max_start_inds, min_end_inds)])).values
-        temp_df['timepoints'] = [timepoints] * len(csid)
-        temp_df['oeid'] = oeid
-        for cn in column_added_names:
-            temp_df[cn] = expt_group.expt_table.loc[oeid][cn]
-        temp_df.set_index('cell_specimen_id', inplace=True)
-        # sort temp_df by cell_specimen_id
-        temp_df.sort_index(inplace=True)
-        trace_df = pd.concat([trace_df, temp_df])
+            temp_df['cell_specimen_id'] = csid
+            temp_df['cell_roi_id'] = crid
+            temp_df['trace'] = dff_df.dff.apply(lambda x: np.concatenate([x[msi: mei] for msi, mei in zip(max_start_inds, min_end_inds)])).values
+            temp_df['timepoints'] = [timepoints] * len(csid)
+            temp_df['oeid'] = oeid
+            for cn in column_added_names:
+                temp_df[cn] = expt_group.expt_table.loc[oeid][cn]
+            temp_df.set_index('cell_specimen_id', inplace=True)
+            # sort temp_df by cell_specimen_id
+            temp_df.sort_index(inplace=True)
+            trace_df = pd.concat([trace_df, temp_df])
+        except:
+            continue
     return trace_df
 
 
