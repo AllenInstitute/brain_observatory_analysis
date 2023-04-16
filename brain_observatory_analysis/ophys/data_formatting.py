@@ -63,7 +63,7 @@ def _set_column_names(expt_group, column_names, column_base_names):
     return column_names, column_added_names
 
 
-def get_trace_df_all(expt_group, session_name, trace_type='dff', column_names=None):
+def get_all_trace_df(expt_group, session_name, trace_type='dff', column_names=None):
     """Get a dataframe of all traces from a session (all ophys trace, either dff or events)
 
     Parameters
@@ -113,7 +113,7 @@ def get_trace_df_all(expt_group, session_name, trace_type='dff', column_names=No
     return trace_df
 
 
-def get_trace_df_no_task(expt_group, session_name, trace_type='dff', column_names=None):
+def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names=None):
     """Get a dataframe of traces from a session (all ophys trace, either dff or events) with no task
     Assume 5 min gray screen before and after task
     and 5 min fingerprint (movie-watching; 30 sec 10 iterations) imaging at the end
@@ -317,7 +317,7 @@ def get_start_end_inds(start_times, stop_times, expt_group, oeids):
     return max_start_inds, min_end_inds
 
 
-def get_trace_df_task(expt_group, session_name, remove_auto_rewarded=True, column_names=None):
+def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, column_names=None):
     """ Get trace_df for a given session
 
     Parameters

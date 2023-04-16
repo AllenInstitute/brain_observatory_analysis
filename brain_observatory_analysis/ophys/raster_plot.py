@@ -63,20 +63,19 @@ def plot_task_raster_with_behav_sort_by_corr(
         lick_template_rate=100, lick_rate_window=1, sub_title_fontsize=10,
         num_cell_threshold=20, vmin=-3, vmax=5):
     fig, ax = plt.subplots(figsize=(12, 8))
-    trace_df_task = df.get_trace_df_task(lamf_group, session_name, remove_auto_rewarded=remove_auto_rewarded)
-    if len(trace_df_task) < num_cell_threshold:
+    task_trace_df = df.get_task_trace_df(lamf_group, session_name, remove_auto_rewarded=remove_auto_rewarded)
+    if len(task_trace_df) < num_cell_threshold:
         print('Too few cells to plot')
         return fig
     else:
-        *_, sort_ind_task, remove_ind = ca.get_correlation_matrices(trace_df_task)
+        *_, sort_ind_task, remove_ind = ca.get_correlation_matrices(task_trace_df)
         if remove_ind is not None:
-            trace_df_task = trace_df_task.reset_index()
-            trace_df_task = trace_df_task.drop(remove_ind)
-            trace_df_task = trace_df_task.set_index('cell_specimen_id')
-        task_traces_all = trace_df_task.trace.values
+            task_trace_df = task_trace_df.reset_index()
+            task_trace_df = task_trace_df.drop(remove_ind)
+            task_trace_df = task_trace_df.set_index('cell_specimen_id')
+        task_traces_all = task_trace_df.trace.values
         task_traces_all_zscore = np.array([(trace - np.nanmean(trace)) / np.nanmean(trace) for trace in task_traces_all])
         task_trace_all_mean = np.nanmean(task_traces_all_zscore, axis=0)
-        sub_title_fontsize=10
         
         # Plot z-scored traces
         ax.imshow(task_traces_all_zscore[sort_ind_task, :], aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
@@ -94,7 +93,7 @@ def plot_task_raster_with_behav_sort_by_corr(
         # Add running speed by interpolating to the timepoints
         oeid = lamf_group.expt_table.query('session_name == @session_name').index.values[0]  # First one can be the representative one
         exp = lamf_group.experiments[oeid]
-        timepoints = trace_df_task.iloc[0].timepoints  # First one can be the representative one
+        timepoints = task_trace_df.iloc[0].timepoints  # First one can be the representative one
 
         running_interp = _get_interpolated_running(exp, timepoints)
         rax = divider.append_axes('bottom', size='20%', pad=0.25, sharex=zax)
@@ -177,19 +176,19 @@ def plot_notask_raster_with_behav_sort_by_corr(
         sub_title_fontsize=10, num_cell_threshold=20,
         vmin_gray=-20, vmax_gray=20, vmin_fingerprint=-3, vmax_fingerprint=5):
 
-    trace_df_no_task_list = df.get_trace_df_no_task(lamf_group, session_name)
+    notask_trace_df_list = df.get_notask_trace_df(lamf_group, session_name)
     epochs = ['gray_pre', 'gray_post', 'fingerprint']
     sub_title_fontsize=10
     fig, ax = plt.subplots(1, len(epochs), figsize=(12, 8))
     run_num = 0
     for ax_ind, epoch in enumerate(epochs):
         epoch_ind = epochs.index(epoch)
-        trace_df = trace_df_no_task_list[epoch_ind]
+        trace_df = notask_trace_df_list[epoch_ind]
         if len(trace_df) < num_cell_threshold:
             continue
         else:
             run_num += 1
-            *_, sort_ind, remove_ind = ca.get_correlation_matrices(trace_df)
+            *_, sort_ind, _, remove_ind = ca.get_correlation_matrices(trace_df)
             if remove_ind is not None:
                 trace_df = trace_df.reset_index()
                 trace_df = trace_df.drop(remove_ind)
@@ -315,9 +314,9 @@ def plot_notask_raster_with_behav_sort_by_corr(
     return fig
 
 
-def get_traces_from_trace_df_task(exp_group, session_name, trace_df_task):
+def get_traces_from_task_trace_df(exp_group, session_name, task_trace_df):
     # Get traces and behavioral variables
-    trace_array, remove_ind, nan_frame_ind = ca.get_trace_array_from_trace_df(trace_df_task)
+    trace_array, remove_ind, nan_frame_ind = ca.get_trace_array_from_trace_df(task_trace_df)
     # standardize trace_array
     # In each row, subtract the mean of the row
     trace_array_t = trace_array.T
@@ -326,7 +325,7 @@ def get_traces_from_trace_df_task(exp_group, session_name, trace_df_task):
 
     oeid = exp_group.expt_table.query('session_name == @session_name').index.values[0]  # First one can be the representative one
     exp = exp_group.experiments[oeid]
-    timepoints = trace_df_task.iloc[0].timepoints  # First one can be the representative one
+    timepoints = task_trace_df.iloc[0].timepoints  # First one can be the representative one
 
     running_interp = _get_interpolated_running(exp, timepoints)
     pupil_interp = _get_interpolated_pupil_diameter(exp, timepoints)
@@ -338,3 +337,25 @@ def get_traces_from_trace_df_task(exp_group, session_name, trace_df_task):
     lickrate_interp_finite_frame = lickrate_interp[finite_frame_ind]
 
     return trace_array, trace_array_std, running_interp_finite_frame, pupil_interp_finite_frame, lickrate_interp_finite_frame, remove_ind
+
+
+def plot_trace_with_time(task_trace_df, timepoint_interval=300):
+    task_traces_all = task_trace_df.trace.values
+    task_traces_all_zscore = np.array([(trace - np.nanmean(trace)) / np.nanmean(trace) for trace in task_traces_all])
+    timepoints = task_trace_df.timepoints.values[0]
+    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+    im = ax.imshow(task_traces_all_zscore, cmap=cmap, vmin=vmin, vmax=vmax, aspect='auto')
+    # find timepoints that are closest to multiples of 300
+    max_timepoint = timepoints[-1] // timepoint_interval * timepoint_interval
+    xticklabels = np.arange(timepoint_interval, max_timepoint, timepoint_interval).astype(int)
+
+    ind_xticks = []
+    for xticklabel in xticklabels:
+        ind_xticks.append(np.argmin(np.abs(timepoints - xticklabel)))
+    xticklabels = (xticklabels/60).astype(int)  # in min
+
+    ax.set_xticks(ind_xticks)
+    ax.set_xticklabels(xticklabels)
+    ax.set_xlabel('Time (min)')
+    # add colorbar
+    fig.colorbar(im, ax=ax)

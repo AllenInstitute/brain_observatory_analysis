@@ -14,21 +14,22 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
     num_nan_frames = len(nan_frames)
 
     remove_ind = np.zeros(0,dtype=np.uint32)
-    if num_nan_frames > num_nan_frames_threshold:
-        num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
-        ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
-        num_nan_cells = len(ind_many_nan_frames)
-        if num_nan_cells / num_cell > nan_cell_prop_threshold:
-            raise ValueError(f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
+    if num_nan_frames > 0:
+        if num_nan_frames > num_nan_frames_threshold:
+            num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
+            ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
+            num_nan_cells = len(ind_many_nan_frames)
+            if num_nan_cells / num_cell > nan_cell_prop_threshold:
+                raise ValueError(f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
+            else:
+                print(f"{num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
+                remove_ind = ind_many_nan_frames
+                valid_trace_array = np.delete(trace_array, remove_ind, axis=0)
+                nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0)>0)[0]
+                num_nan_frames = len(nan_frames)
+                print(f"{num_nan_frames} frames with nan values")
         else:
-            print(f"{num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
-            remove_ind = ind_many_nan_frames
-            valid_trace_array = np.delete(trace_array, remove_ind, axis=0)
-            nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0)>0)[0]
-            num_nan_frames = len(nan_frames)
             print(f"{num_nan_frames} frames with nan values")
-    else:
-        print(f"{num_nan_frames} frames with nan values")
         
     return trace_array, remove_ind, nan_frames
 
@@ -73,9 +74,10 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
 
     # sort by global mean correlation
     mean_corr = np.nanmean(corr, axis=0)
-    mean_corr_sorted_ind = np.argsort(mean_corr)[::-1]
+    mean_corr_sorted_ind = np.argsort(mean_corr)[::-1]  # descending order
     corr_ordered = corr[mean_corr_sorted_ind, :][:, mean_corr_sorted_ind]
 
+    # trace_df is grouped by experiemnts, so we can get the number of cells in each experiment
     numcell_cumsum = np.cumsum([x[0] for x in trace_df.groupby(['oeid']).count().values])
     xy_ticks = np.insert(numcell_cumsum, 0, 0)
     xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first().targeted_structure.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
@@ -83,14 +85,17 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
 
     # order the corr matrix by the mean correlation of each cell within each oeid
     trace_array_ordered_by_region = np.zeros_like(trace_array)
+    within_region_sorted_ind = np.array(range(0, corr.shape[0]))
     for i in range(len(numcell_cumsum)):
         # find the order within each oeid
         within_mean_corr = np.mean(corr[xy_ticks[i]: xy_ticks[i + 1], xy_ticks[i]: xy_ticks[i + 1]], axis=1)
         within_order = np.argsort(-within_mean_corr)  # descending order
-        trace_array_ordered_by_region[xy_ticks[i]:xy_ticks[i + 1], :] = trace_array[xy_ticks[i]: xy_ticks[i + 1], :][within_order, :]
+        # trace_array_ordered_by_region[xy_ticks[i]:xy_ticks[i + 1], :] = trace_array[xy_ticks[i]: xy_ticks[i + 1], :][within_order, :]
+        within_region_sorted_ind[xy_ticks[i]:xy_ticks[i + 1]] = within_region_sorted_ind[xy_ticks[i]:xy_ticks[i + 1]][within_order]
+    trace_array_ordered_by_region = trace_array[within_region_sorted_ind, :]
     corr_ordered_by_region = np.corrcoef(trace_array_ordered_by_region)
 
-    return corr, corr_ordered, corr_ordered_by_region, xy_labels, xy_label_pos, mean_corr_sorted_ind, remove_ind
+    return corr, corr_ordered, corr_ordered_by_region, xy_labels, xy_label_pos, mean_corr_sorted_ind, within_region_sorted_ind, remove_ind
 
 
 # Comparing between different epochs and events
