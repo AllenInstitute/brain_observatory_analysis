@@ -58,8 +58,8 @@ def start_lamf_analysis(verbose=False):
     recent_expts = etu.experiment_table_extended(recent_expts)
 
     # filter by lamftask1a mice
-    names = ["Gold", "Silver", "Bronze", "Copper", "Nickle",
-             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron"]
+    names = ["Gold", "Silver", "Bronze", "Copper", "Nickel",
+             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron", "Cobalt"]
     recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
 
     recent_expts = etu.experiment_table_extended_project(recent_expts,

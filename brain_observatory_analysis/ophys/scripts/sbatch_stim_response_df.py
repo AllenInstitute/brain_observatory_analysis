@@ -12,12 +12,17 @@ parser.add_argument('--env-path', type=str, default='//data/learning/mattd/minic
 parser.add_argument('--dry_run', action='store_true', default=False, help='dry run')
 parser.add_argument('--test_run', action='store_true', default=False, help='test one parameter set')
 
-ROOT_DIR = Path("/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df")
+parser.add_argument('--event_type', type=str, default='changes', metavar="event type to use for dff: omissions, images, changes", required=True)
+parser.add_argument('--data_type', type=str, default='dff', metavar="data type to use for dff: dff, events, filtered_events", required=True)
+
+ROOT_DIR = Path("/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df_nrsac")
 
 if __name__ == '__main__':
     args = parser.parse_args()
     dry_run = args.dry_run
     test_run = args.test_run
+    event_type = args.event_type
+    data_type = args.data_type
     python_executable = f"{args.env_path}/bin/python"
 
     # py file
@@ -30,57 +35,58 @@ if __name__ == '__main__':
 
     # oeids
     expt_table = start_lamf_analysis()
+    for event_type in ["omissions", "changes"]:
+        for data_type in ["events", "filtered_events"]:
 
-    omissions = False
-    event_type = "images"
+            if event_type == "omissions":
+                short_session_types = ["Familiar Images + omissions", "Novel Images + omissions", "Novel Images EXTINCTION"]
+                expt_table = expt_table[expt_table['short_session_type'].isin(short_session_types)]
 
-    if omissions:
-        short_session_types = ["Familiar Images + omissions", "Novel Images + omissions", "Novel Images EXTINCTION"]
-        expt_table = expt_table[expt_table['short_session_type'].isin(short_session_types)]
+            expt_ids = expt_table.index.values
 
-    expt_ids = expt_table.index.values
+            if dry_run:
+                print('dry run, exiting')
+                exit()
+            # bash folder size
+            
+            job_count = 0
+            print('number of jobs = {}'.format(len(expt_ids)))
 
-    if dry_run:
-        print('dry run, exiting')
-        exit()
-    # bash folder size
-    
-    job_count = 0
-    print('number of jobs = {}'.format(len(expt_ids)))
+            if test_run:
+                expt_ids = expt_ids[0:1]
 
-    if test_run:
-        expt_ids = expt_ids[0:1]
+            print('Total number of jobs = {}'.format(len(expt_ids)))
 
-    for oeid in expt_ids:
+            for oeid in expt_ids:
 
-        job_count += 1
-        print(f'starting cluster job for {oeid}, job count = {job_count}')
+                job_count += 1
+                print(f'starting cluster job for {oeid}, job count = {job_count}')
 
-        job_title = f'{oeid}_gen_stim_response_df'
-        walltime = '00:15:00'
-        mem = '2G'
-        # tmp = '3G',
-        job_id = Slurm.JOB_ARRAY_ID
-        job_array_id = Slurm.JOB_ARRAY_MASTER_ID
-        output = stdout_location / f'{job_array_id}_{job_id}_{oeid}.out'
-        cpus_per_task = 1
-        print(output)
+                job_title = f'{oeid}_gen_stim_response_df'
+                walltime = '00:15:00'
+                mem = '2G'
+                # tmp = '3G',
+                job_id = Slurm.JOB_ARRAY_ID
+                job_array_id = Slurm.JOB_ARRAY_MASTER_ID
+                output = stdout_location / f'{job_array_id}_{job_id}_{oeid}.out'
+                cpus_per_task = 1
+                print(output)
 
-        # instantiate a SLURM object
-        slurm = Slurm(
-            cpus_per_task=cpus_per_task,
-            job_name=job_title,
-            time=walltime,
-            mem=mem,
-            output=output,
-            # tmp=tmp,
-            partition="braintv"
-        )
+                # instantiate a SLURM object
+                slurm = Slurm(
+                    cpus_per_task=cpus_per_task,
+                    job_name=job_title,
+                    time=walltime,
+                    mem=mem,
+                    output=output,
+                    # tmp=tmp,
+                    partition="braintv"
+                )
 
-        args_string = f"--oeid {oeid} --event_type {event_type} --data_type dff"
-        print(args_string)
+                args_string = f"--oeid {oeid} --event_type {event_type} --data_type {data_type}"
+                print(args_string)
 
-        sbatch_string = f"{python_executable} {python_file} {args_string}"
-        print(sbatch_string)
-        slurm.sbatch(sbatch_string)
-        time.sleep(0.01)
+                sbatch_string = f"{python_executable} {python_file} {args_string}"
+                print(sbatch_string)
+                slurm.sbatch(sbatch_string)
+                time.sleep(0.01)

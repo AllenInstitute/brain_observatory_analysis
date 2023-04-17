@@ -66,7 +66,7 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                             event_type=event_type,
                                             data_type=data_type,
                                             load_from_file=load_from_file,
-                                            save_to_file=True)
+                                            save_to_file=False)
             
             sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
             mdf = get_standard_mean_df(sdf)
@@ -103,7 +103,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                               save_to_file: bool = False,
                               load_from_file: bool = False,
                               # # "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"
-                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df"):
+                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df_nrsac"):
     """Helper function for get_stimulus_response_df
 
     Parameters
@@ -197,7 +197,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                 if (cache_dir / fn).exists():
                     print(f"Overwriting stim response df for {expt_id} in file")
                 sdf.to_pickle(cache_dir / fn)
-                print(f"Saving stim response df for {expt_id} to file")
+                print(f"SAVED: stim_response_df for {expt_id} to {cache_dir / fn}")
 
                 params["stimulus_response_df_path"] = str(cache_dir / fn)
 

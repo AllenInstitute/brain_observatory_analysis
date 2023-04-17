@@ -26,15 +26,14 @@ if __name__ == '__main__':
     data_type = args.data_type
 
 
-    expt = get_ophys_expt(oeid)
-
+    expt = get_ophys_expt(oeid, dev=True)
 
     if expt is not None:
         sr_df = sr._get_stimulus_response_df(expt,
-                                                event_type=event_type,
-                                                data_type=data_type,
-                                                load_from_file=False,
-                                                save_to_file=True)
+                                             event_type=event_type,
+                                             data_type=data_type,
+                                             load_from_file=False,
+                                             save_to_file=True)
     else:
         print(f'failed to generate stim response df for {oeid}')
 
