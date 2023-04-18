@@ -1,3 +1,14 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from allensdk.brain_observatory.behavior.behavior_ophys_experiment import \
+    BehaviorOphysExperiment
+from allensdk.brain_observatory.behavior.stimulus_processing import \
+    get_stimulus_epoch_table
+
+
+
 def plot_mean_trace(traces, timestamps, ylabel='dF/F', legend_label=None, color='k', interval_sec=1, xlim_seconds=[-2, 2],
                     plot_sem=True, ax=None):
     if ax is None:
