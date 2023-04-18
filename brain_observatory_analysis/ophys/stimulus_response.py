@@ -23,7 +23,8 @@ import pickle
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           event_type: str = "changes",
                                           data_type: str = "dff",
-                                          load_from_file: bool = True) -> pd.DataFrame:
+                                          load_from_file: bool = True,
+                                          save_to_file: bool = False) -> pd.DataFrame:
     """
     Get mean stimulus response for each cell in the experiment group
 
@@ -34,6 +35,11 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
     event_type: str
         The event type ["changes", "omissions", "images", "all"]
         see get_stimulus_response_df() for more details
+    data_type: str
+        The data type ["dff", "events", "filtered_events"]
+        see get_stimulus_response_df() for more details
+    load_from_file: bool
+
 
     Returns
     -------
@@ -66,7 +72,7 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                             event_type=event_type,
                                             data_type=data_type,
                                             load_from_file=load_from_file,
-                                            save_to_file=False)
+                                            save_to_file=save_to_file)
             
             sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
             mdf = get_standard_mean_df(sdf)
