@@ -3,7 +3,7 @@ import numpy as np
 
 from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
-# from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
+# from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
 #     BehaviorOphysExperimentDev
 # from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
 #     import BehaviorOphysExperiment
