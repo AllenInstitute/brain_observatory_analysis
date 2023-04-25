@@ -1,5 +1,6 @@
 import os
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from pathlib import Path
 
 # make valid file extensions all possible image saving extensions
@@ -48,3 +49,32 @@ class PlotSaver:
         if not any(filename.endswith(ext) for ext in VALID_EXTENSIONS):
             filename = filename + '.png'
         return filename
+
+
+# another way of figure saving, including params settings to create illustrator editable PDFs
+def save_figure(fig, figsize, save_dir, folder, fig_title, formats=['.png', '.pdf']):
+    """
+    Function to save a matplotlib figure to a specified directory and subfolder, 
+    with filename as an argument that can be iterated over to deposit many plots in a single folder.
+    if 'folder' does not exist, it will be created
+    if '.pdf' is included in formats, PDF will be saved in illustrator editable format
+
+    fig: matplotlib figure handle
+    figsize: tuple with desired figsize
+    save_dir: base directory in which to save figures
+    folder: sub-directory within save_dir where figures should be saved
+            if sub-directory folder does not exist in save_dir, it will be created
+            Useful when iterating over many figures that should be saved to the same folder, 
+            or over multiple types of plots saved in different folders in save_dir
+    fig_title: filename of the saved figure
+    formats: list options for PNG or PDF file formats
+
+    """
+    fig_dir = os.path.join(save_dir, folder)
+    if not os.path.exists(fig_dir):
+        os.mkdir(fig_dir)
+    filename = os.path.join(fig_dir, fig_title)
+    mpl.rcParams['pdf.fonttype'] = 42
+    fig.set_size_inches(figsize)
+    for f in formats:
+        fig.savefig(filename + f, transparent=True, orientation='landscape', bbox_inches='tight', dpi=300, facecolor=fig.get_facecolor())

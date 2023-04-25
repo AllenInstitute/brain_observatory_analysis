@@ -23,6 +23,7 @@ import pickle
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           event_type: str = "changes",
                                           data_type: str = "dff",
+                                          conditions: list = [],
                                           load_from_file: bool = True) -> pd.DataFrame:
     """
     Get mean stimulus response for each cell in the experiment group
@@ -34,6 +35,11 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
     event_type: str
         The event type ["changes", "omissions", "images", "all"]
         see get_stimulus_response_df() for more details
+    conditions: list of columns in stimulus_response_df to group over before taking the mean
+        ex: ['cell_specimen_id, "image_name"] will give the mean response (for the given event_type)
+        for each image in each experiment 
+        If conditions is an emtpy list, "standard" mean df will be calculated, which is simply the 
+        average across all events provided in "event_type". 
 
     Returns
     -------
@@ -69,7 +75,10 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                             save_to_file=False)
             
             sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
-            mdf = get_standard_mean_df(sdf)
+            if len(conditions) == 0:
+                mdf = get_standard_mean_df(sdf)
+            else: 
+                mdf = get_mean_df(sdf, conditions)
             mdf["ophys_experiment_id"] = expt_id
             mdf["event_type"] = event_type
             mdf["data_type"] = data_type
@@ -102,7 +111,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                               save_to_file: bool = False,
                               load_from_file: bool = False,
                               # # "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"
-                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df_nrsac"):
+                              cache_dir: Union[str, Path] = r"\\allen\programs\mindscope\workgroups\learning\analysis_data_cache\stim_response_df_nrsac"):
     """Helper function for get_stimulus_response_df
 
     Parameters
@@ -156,8 +165,9 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
         # unique_fn = f"{dt_string}_{base_fn}"
         base_fn = f"{expt_id}_{data_type}_{event_type}"
         fn = f"{base_fn}.pkl"
-
-        if (cache_dir / fn).exists() and load_from_file:
+        filename = (cache_dir / fn)
+        # filename = os.path.join(cache_dir, fn)
+        if filename.exists() and load_from_file:
             sdf = pd.read_pickle(cache_dir / fn)
             print(f"Loading stim response df for {expt_id} from file")
         else:
@@ -246,8 +256,8 @@ def get_standard_mean_df(sr_df):
 # TODO: clean + document
 def get_mean_df(stim_response_df: pd.DataFrame,
                 conditions=['cell_roi_id', 'image_name'],
-                frame_rate=11.0,
-                window_around_timepoint_seconds: list = [-3, 3],
+                frame_rate=10.7,
+                window_around_timepoint_seconds: list = [-3, 3.1],
                 response_window_duration_seconds: float = 0.5,
                 get_pref_stim=True,
                 exclude_omitted_from_pref_stim=True):
