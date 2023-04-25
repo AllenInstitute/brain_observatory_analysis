@@ -111,7 +111,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                               save_to_file: bool = False,
                               load_from_file: bool = False,
                               # # "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"
-                              cache_dir: Union[str, Path] = r"\\allen\programs\mindscope\workgroups\learning\analysis_data_cache\stim_response_df_nrsac"):
+                              cache_dir: Union[str, Path] = "//allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df_nrsac"):
     """Helper function for get_stimulus_response_df
 
     Parameters
@@ -234,7 +234,7 @@ def get_standard_mean_df(sr_df):
         response_window_duration = sr_df.response_window_duration.values[0]
 
     output_sampling_rate = sr_df.ophys_frame_rate.unique()[0]
-    conditions = ["cell_roi_id"]
+    conditions = ['cell_specimen_id'] #["cell_roi_id"] #
 
     if get_pref_stim:
         # options for groupby "change_image_name", "image_name", "prior_image_name"
