@@ -8,6 +8,20 @@ from brain_observatory_analysis.utilities import data_utils as du
 
 
 def _get_pupil_diameter(exp):
+    """Get pupil diameter and timestamps from the experiment object
+
+    Parameters
+    ----------
+    exp : VisualBehaviorOphysExperiment
+        Experiment object
+
+    Returns
+    -------
+    pupil_diameter : array
+        Pupil diameter
+    eye_timestamps : array
+        Timestamps of the pupil diameter
+    """
     if len(exp.eye_tracking) > 0:  # Sometimes, eye_tracking is empty
         eye_timestamps = exp.eye_tracking.timestamps.values
         if 'pupil_diameter' in exp.eye_tracking.columns:
@@ -23,6 +37,22 @@ def _get_pupil_diameter(exp):
 
 
 def _get_interpolated_running(exp, timepoints):
+    """ Get interpolated running speed from the experiment object
+
+    Parameters
+    ----------
+    exp : VisualBehaviorOphysExperiment
+        Experiment object
+
+    timepoints : array
+        Timepoints to interpolate the running speed to
+
+    Returns
+    -------
+    running_interp : array
+        Interpolated running speed
+        
+    """
     running_timestamps = exp.running_speed.timestamps.values
     running_speed = exp.running_speed.speed.values
     running_interp = du.get_interpolated_time_series(running_timestamps, running_speed, timepoints)
@@ -30,6 +60,22 @@ def _get_interpolated_running(exp, timepoints):
 
 
 def _get_interpolated_pupil_diameter(exp, timepoints):
+    """ Get interpolated pupil diameter from the experiment object
+
+    Parameters
+    ----------
+    exp : VisualBehaviorOphysExperiment
+        Experiment object
+
+    timepoints : array
+        Timepoints to interpolate the pupil diameter to
+
+    Returns
+    -------
+    pupil_diameter_interp : array
+        Interpolated pupil diameter
+    """
+
     pupil_diameter, eye_timestamps = _get_pupil_diameter(exp)
     if pupil_diameter is not None:
         pupil_diameter_interp = du.get_interpolated_time_series(eye_timestamps, pupil_diameter, timepoints)
@@ -39,6 +85,27 @@ def _get_interpolated_pupil_diameter(exp, timepoints):
 
 
 def _get_interpolated_lickrate(exp, timepoints, lick_template_rate=100, lick_rate_window=1):
+    """ Get interpolated lick rate from the experiment object
+
+    Parameters
+    ----------
+    exp : VisualBehaviorOphysExperiment
+        Experiment object
+
+    timepoints : array
+        Timepoints to interpolate the lick rate to
+
+    lick_template_rate : int, optional
+        Sampling rate of the lick template, by default 100 Hz
+
+    lick_rate_window : float, optional
+        Window size for calculating the lick rate, by default 1 s
+
+    Returns
+    -------
+    lickrate_interp : array
+        Interpolated lick rate
+    """
     lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate, 
                                    1 / lick_template_rate)  # timestamps are in seconds
     licks = np.zeros(len(lick_time_template))
@@ -62,6 +129,36 @@ def plot_task_raster_with_behav_sort_by_corr(
         lamf_group, session_name, remove_auto_rewarded=True,
         lick_template_rate=100, lick_rate_window=1, sub_title_fontsize=10,
         num_cell_threshold=20, vmin=-3, vmax=5):
+    """Plot task raster with behavioral variables
+    The raster is sorted by mean correlation coefficients among neurons
+
+    Parameters
+    ----------
+    lamf_group : LAMFGroup
+        LAMFGroup object
+    session_name : str
+        Session name
+    remove_auto_rewarded : bool, optional
+        Whether to remove auto rewarded trials, by default True
+    lick_template_rate : int, optional
+        Sampling rate of the lick template, by default 100 Hz
+    lick_rate_window : float, optional
+        Window size for calculating the lick rate, by default 1 s
+    sub_title_fontsize : int, optional
+        Font size of the sub title, by default 10
+    num_cell_threshold : int, optional
+        Threshold for the number of cells, by default 20
+    vmin : int, optional
+        Minimum value for the colormap, by default -3
+    vmax : int, optional
+        Maximum value for the colormap, by default 5
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure object
+    """
+
     fig, ax = plt.subplots(figsize=(12, 8))
     task_trace_df = df.get_task_trace_df(lamf_group, session_name, remove_auto_rewarded=remove_auto_rewarded)
     if len(task_trace_df) < num_cell_threshold:
@@ -175,10 +272,41 @@ def plot_notask_raster_with_behav_sort_by_corr(
         lick_template_rate=100, lick_rate_window=1,
         sub_title_fontsize=10, num_cell_threshold=20,
         vmin_gray=-20, vmax_gray=20, vmin_fingerprint=-3, vmax_fingerprint=5):
+    """ Plot a raster of the notask data, sorted by correlation with behavior
+
+    Parameters
+    ----------
+    lamf_group : LAMFGroup
+        The LAMFGroup object containing the data
+    session_name : str
+        The name of the session to plot
+    remove_auto_rewarded : bool, optional
+        Whether to remove auto-rewarded trials from the lick rate calculation, by default True
+    lick_template_rate : int, optional
+        The sampling rate of the lick template, by default 100
+    lick_rate_window : int, optional
+        The window size (in seconds) to use for calculating the lick rate, by default 1 s
+    sub_title_fontsize : int, optional
+        The fontsize to use for the subplots, by default 10
+    num_cell_threshold : int, optional
+        The minimum number of cells to plot - if less than this, don't plot, by default 20
+    vmin_gray : float, optional
+        The minimum value for the gray epoch colormap, by default -20
+    vmax_gray : float, optional
+        The maximum value for the gray epoch colormap, by default 20
+    vmin_fingerprint : float, optional
+        The minimum value for the fingerprint epoch colormap, by default -3
+    vmax_fingerprint : float, optional
+        The maximum value for the fingerprint epoch colormap, by default 5
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure object
+    """
 
     notask_trace_df_list = df.get_notask_trace_df(lamf_group, session_name)
     epochs = ['gray_pre', 'gray_post', 'fingerprint']
-    sub_title_fontsize=10
     fig, ax = plt.subplots(1, len(epochs), figsize=(12, 8))
     run_num = 0
     for ax_ind, epoch in enumerate(epochs):
@@ -315,6 +443,32 @@ def plot_notask_raster_with_behav_sort_by_corr(
 
 
 def get_traces_from_task_trace_df(exp_group, session_name, task_trace_df):
+    """Get traces and behavioral variables from task_trace_df
+
+    Parameters
+    ----------
+    exp_group : ExperimentGroup
+        ExperimentGroup object
+    session_name : str
+        Session name
+    task_trace_df : pandas.DataFrame
+        DataFrame containing traces and behavioral variables
+
+    Returns
+    -------
+    trace_array : numpy.ndarray
+        Traces
+    trace_array_std : numpy.ndarray
+        Standardized traces
+    running_interp : numpy.ndarray
+        Interpolated running speed
+    lickrate_interp : numpy.ndarray
+        Interpolated lick rate
+    reward_interp : numpy.ndarray
+        Interpolated reward
+    timepoints : numpy.ndarray
+        Timepoints
+    """
     # Get traces and behavioral variables
     trace_array, remove_ind, nan_frame_ind = ca.get_trace_array_from_trace_df(task_trace_df)
     # standardize trace_array
@@ -339,7 +493,27 @@ def get_traces_from_task_trace_df(exp_group, session_name, task_trace_df):
     return trace_array, trace_array_std, running_interp_finite_frame, pupil_interp_finite_frame, lickrate_interp_finite_frame, remove_ind
 
 
-def plot_trace_with_time(task_trace_df, timepoint_interval=300):
+def plot_trace_with_time(task_trace_df, timepoint_interval=300, cmap='viridis', vmin=-0.5, vmax=1.2):
+    """Plot traces with time
+    
+    Parameters
+    ----------
+    task_trace_df : pandas.DataFrame
+        DataFrame containing traces and behavioral variables
+    timepoint_interval : int
+        Interval of timepoints to plot
+    cmap : str, optional
+        Colormap, by default 'viridis'
+    vmin : float, optional
+        Minimum value for the colormap, by default -0.5
+    vmax : float, optional
+        Maximum value for the colormap, by default 1.2
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure
+    """
     task_traces_all = task_trace_df.trace.values
     task_traces_all_zscore = np.array([(trace - np.nanmean(trace)) / np.nanmean(trace) for trace in task_traces_all])
     timepoints = task_trace_df.timepoints.values[0]
@@ -352,10 +526,12 @@ def plot_trace_with_time(task_trace_df, timepoint_interval=300):
     ind_xticks = []
     for xticklabel in xticklabels:
         ind_xticks.append(np.argmin(np.abs(timepoints - xticklabel)))
-    xticklabels = (xticklabels/60).astype(int)  # in min
+    xticklabels = (xticklabels / 60).astype(int)  # in min
 
     ax.set_xticks(ind_xticks)
     ax.set_xticklabels(xticklabels)
     ax.set_xlabel('Time (min)')
     # add colorbar
     fig.colorbar(im, ax=ax)
+
+    return fig

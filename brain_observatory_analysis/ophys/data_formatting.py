@@ -81,7 +81,7 @@ def get_all_trace_df(expt_group, session_name, trace_type='dff', column_names=No
         dataframe of all traces from a session
     
     """
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     if column_names is None:
         column_names = _default_column_names()
     column_base_names = _default_column_base_names()
@@ -140,7 +140,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
         dataframe of traces from fingerprint (movie-watching; 30 sec 10 iterations) imaging at the end
     """
     gray_period = 5 * 60  # 5 minutes
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     stim_df = data_formatting.annotate_stimuli(expt_group.experiments[oeids[0]])  # First experiment represents the session stimulus presentations
     
     # Match the # of indices from each experiment
@@ -219,7 +219,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
             temp_df[cn] = expt_group.expt_table.loc[oeid][cn]
         temp_df.set_index('cell_specimen_id', inplace=True)
         if run_pre_gray:
-            if trace_type=='dff':
+            if trace_type == 'dff':
                 temp_df['trace'] = trace_df.dff.apply(lambda x: x[:min_start_ind]).values
             else:  # Other types already dealt with from above
                 temp_df['trace'] = trace_df.events.apply(lambda x: x[:min_start_ind]).values
@@ -227,7 +227,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
             sorted_temp_df = temp_df.sort_index(inplace=False)
             trace_df_gray_pre_task = pd.concat([trace_df_gray_pre_task, sorted_temp_df])
         if run_post_gray:
-            if trace_type=='dff':
+            if trace_type == 'dff':
                 temp_df['trace'] = trace_df.dff.apply(lambda x: x[max_end_ind:min_post_gray_end_ind]).values
             else:
                 temp_df['trace'] = trace_df.events.apply(lambda x: x[max_end_ind:min_post_gray_end_ind]).values
@@ -235,7 +235,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
             sorted_temp_df = temp_df.sort_index(inplace=False)
             trace_df_gray_post_task = pd.concat([trace_df_gray_post_task, sorted_temp_df])
             if run_fingerprint:
-                if trace_type=='dff':
+                if trace_type == 'dff':
                     temp_df['trace'] = trace_df.dff.apply(lambda x: x[min_post_gray_end_ind:]).values
                 else:
                     temp_df['trace'] = trace_df.events.apply(lambda x: x[min_post_gray_end_ind:]).values
@@ -337,7 +337,7 @@ def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, colum
         A dataframe containing trace information during the whole task
     """
     
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     stim_df = data_formatting.annotate_stimuli(expt_group.experiments[oeids[0]])  # First experiment represents the session stimulus presentations
     # Only works on old allensdk version (or lamf_hacks branch of MJD's fork)
     # TODO: when using updated version of allensdk (>2.13.6), change the code accordingly:
@@ -384,7 +384,7 @@ def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, colum
             # sort temp_df by cell_specimen_id
             temp_df.sort_index(inplace=True)
             trace_df = pd.concat([trace_df, temp_df])
-        except:
+        except:  # noqa: E722
             continue
     return trace_df
 
@@ -438,7 +438,7 @@ def get_event_annotated_response_df(exp, event_type, data_type='dff', image_orde
     """
     if exp.cell_specimen_table.index.unique()[0] is not None:
         response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, event_type=event_type, image_order=image_order,
-                                                            time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate)
+                                                               time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate)
         stim_df = get_all_annotated_stimulus_presentations(exp)
         response_df = response_df.merge(stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
         response_df['oeid'] = exp.ophys_experiment_id
@@ -478,7 +478,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
         A dataframe containing traces for a given session and event type
     """
 
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     # Set the column names
     if column_names is None:
         column_names = _default_column_names()
@@ -489,7 +489,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
         csids = expt_group.experiments[oeid].cell_specimen_table.index.values
-        if event_type=='images>n-changes':
+        if event_type == 'images>n-changes':
             response_df = get_event_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=event_type, image_order=image_order,
                                                           inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
         else:
@@ -498,18 +498,18 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
         
         if len(response_df) > 0:
             if remove_auto_rewarded:
-                response_df = response_df[response_df.auto_rewarded==False]  # noqa: E712
+                response_df = response_df[response_df.auto_rewarded == False]  # noqa: E712
 
             first_timestamps = response_df.trace_timestamps.values[0]
-            assert response_df.trace_timestamps.apply(lambda x: np.all(x==first_timestamps)).all()
-            start_index = np.where(first_timestamps>=0)[0][0]  
-            end_index = np.where(first_timestamps<=inter_image_interval)[0][-1]  # The last index is going to be not included
+            assert response_df.trace_timestamps.apply(lambda x: np.all(x == first_timestamps)).all()
+            start_index = np.where(first_timestamps >= 0)[0][0]  
+            end_index = np.where(first_timestamps <= inter_image_interval)[0][-1]  # The last index is going to be not included
 
             csids = response_df.cell_specimen_id.unique()
             crids = []
             trace_all = []
             for csid in csids:
-                csid_df = response_df[response_df.cell_specimen_id==csid]
+                csid_df = response_df[response_df.cell_specimen_id == csid]
                 crids.append(csid_df.cell_roi_id.values[0])
                 csid_trace = np.concatenate(csid_df.trace.apply(lambda x: x[start_index:end_index]).values)
                 trace_all.append(csid_trace)
@@ -551,7 +551,7 @@ def get_all_annotated_session_response_df(expt_group, session_name, inter_image_
         DataFrame with stimulus presentations for all experiments in a session
     """
     
-    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower()==session_name.lower()].index.values)
+    oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     response_df = pd.DataFrame()
     for oeid in oeids:
         exp = expt_group.experiments[oeid]
@@ -581,26 +581,26 @@ def get_trace_df_event_from_all_response_df(response_df_session, expt_group, eve
         DataFrame with traces for a particular event type from all experiments in a session
     """
 
-    if event_type=='images-n-omissions':
+    if event_type == 'images-n-omissions':
         condition = (response_df_session['n_after_omission']==image_order) & \
                     (response_df_session['n_after_change'] > response_df_session['n_after_omission'])  # noqa E501
-    elif event_type=='images-n-changes':
+    elif event_type == 'images-n-changes':
         condition = (response_df_session['n_after_change']==image_order) & \
                     ((response_df_session['n_after_omission'] > response_df_session['n_after_change']) | # noqa E501  
                         (response_df_session['n_after_omission'] == -1))  # for trials without omission
-    elif event_type=='images>n-omissions':
+    elif event_type == 'images>n-omissions':
         condition = (response_df_session['n_after_omission'] > image_order) & \
                     (response_df_session['n_after_change'] > response_df_session['n_after_omission'])
-    elif event_type=='images>n-changes':
+    elif event_type == 'images>n-changes':
         condition = (response_df_session['n_after_change'] > image_order) & \
                     ((response_df_session['n_after_omission'] > image_order) |  # noqa E501
                         (response_df_session['n_after_omission'] == -1))  # for trials without omission
-    elif event_type=='images-n-before-changes':
+    elif event_type == 'images-n-before-changes':
         condition = (response_df_session['n_before_change'] == image_order) & \
                     (response_df_session['n_after_omission'] == -1)  # Get trials without omission only
-    elif event_type=='changes':
+    elif event_type == 'changes':
         condition = (response_df_session['n_after_change'] == 0)
-    elif event_type=='omissions':
+    elif event_type == 'omissions':
         condition = (response_df_session['n_after_omission'] == 0)
     else:
         raise ValueError('event_type not recognized')
@@ -644,14 +644,14 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
         csids = response_df_oeid.cell_specimen_id.unique()
         
         first_timestamps = response_df_oeid.trace_timestamps.values[0]
-        assert response_df_oeid.trace_timestamps.apply(lambda x: np.all(x==first_timestamps)).all()
-        start_index = np.where(first_timestamps>=0)[0][0]
-        end_index = np.where(first_timestamps<=inter_image_interval)[0][-1]
+        assert response_df_oeid.trace_timestamps.apply(lambda x: np.all(x == first_timestamps)).all()
+        start_index = np.where(first_timestamps >= 0)[0][0]
+        end_index = np.where(first_timestamps <= inter_image_interval)[0][-1]
 
         crids = []
         trace_all = []
         for csid in csids:
-            csid_df = response_df_oeid[response_df_oeid.cell_specimen_id==csid]
+            csid_df = response_df_oeid[response_df_oeid.cell_specimen_id == csid]
             crids.append(csid_df.cell_roi_id.values[0])
             csid_trace = np.concatenate(csid_df.trace.apply(lambda x: x[start_index:end_index]).values)
             trace_all.append(csid_trace)
@@ -671,6 +671,21 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
 
 
 def get_concatenated_mean_response_df_from_response_df(response_df, csid_list=None):
+    """Get concatenated mean response DataFrame from response DataFrame
+
+    Parameters
+    ----------
+    response_df: pandas DataFrame
+        DataFrame with stimulus presentations for all experiments in a session
+    csid_list: list, optional
+        List of cell_specimen_ids to include in the concatenated mean response DataFrame, default None
+
+    Returns
+    -------
+    mean_response_df: pandas DataFrame
+        DataFrame with concatenated mean responses for all experiments in a session
+    """
+
     non_auto_rewarded_response_df = response_df.query('auto_rewarded == False')
     change_response_df = non_auto_rewarded_response_df.query('is_change==True and auto_rewarded == False')
     change_response_df['trace_norm'] = change_response_df.apply(lambda x: x.trace - x.trace[0], axis=1)
@@ -681,7 +696,7 @@ def get_concatenated_mean_response_df_from_response_df(response_df, csid_list=No
 
     cell_specimen_ids = np.sort(response_df.cell_specimen_id.unique())
     temp_df = response_df[['cell_specimen_id', 'trace']].groupby('cell_specimen_id').mean()
-    assert (temp_df.index.values - cell_specimen_ids).any() == False
+    assert (temp_df.index.values - cell_specimen_ids).any() == False  # noqa: E712
 
     trace_timestamps = response_df.trace_timestamps.values[0]
     mean_response_change_df = pd.DataFrame({'cell_specimen_id': cell_specimen_ids})
@@ -703,8 +718,8 @@ def get_concatenated_mean_response_df_from_response_df(response_df, csid_list=No
     mean_response_omission_df['trace_norm'] = omission_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanmean(x, axis=0)).values
     mean_response_omission_df['trace_std_norm'] = omission_response_df[['cell_specimen_id', 'trace_norm']].groupby('cell_specimen_id').apply(lambda x: np.vstack(x['trace_norm'])).apply(lambda x: np.nanstd(x, axis=0)).values
 
-    assert (mean_response_change_df.index.values - mean_response_image_df.index.values).any() == False
-    assert (mean_response_change_df.index.values - mean_response_omission_df.index.values).any() == False
+    assert (mean_response_change_df.index.values - mean_response_image_df.index.values).any() == False  # noqa: E712
+    assert (mean_response_change_df.index.values - mean_response_omission_df.index.values).any() == False  # noqa: E712
 
     concat_mean_trace = np.hstack([np.vstack(mean_response_change_df.trace.values), np.vstack(mean_response_image_df.trace.values), np.vstack(mean_response_omission_df.trace.values)])
     concat_mean_trace_norm = np.hstack([np.vstack(mean_response_change_df.trace_norm.values), np.vstack(mean_response_image_df.trace_norm.values), np.vstack(mean_response_omission_df.trace_norm.values)])

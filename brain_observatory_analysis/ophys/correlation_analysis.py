@@ -5,6 +5,32 @@ import brain_observatory_analysis.ophys.data_formatting as df
 
 
 def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_cell_prop_threshold=0.2):
+    """ Get trace array from trace dataframe
+    If number of frames with nan values is small, it's okay to just remove those frames
+    If number of frames with nan values is large, something is wrong with the data
+        If number of cells with large number of nan frames is small, it's okay to just remove those cells
+    Ideally, there should be no nan values in the trace array:
+        If it happens, it means there is something wrong in the data or data processing.
+
+    Parameters
+    ----------
+    trace_df: pandas.DataFrame
+        A dataframe containing traces for a given session and event type
+    nan_frame_prop_threshold: float, optional
+        Threshold for the proportion of nan frames in a cell, default 0.2
+    nan_cell_prop_threshold: float, optional
+        Threshold for the proportion of nan cells in a session, default 0.2
+
+    Returns
+    -------
+    trace_array: np.ndarray (2d)
+        Trace array
+    remove_ind: np.ndarray (1d)
+        Indices of cells to be removed due to large number of nan frames
+    nan_frames: np.ndarray (1d)
+        Indices of frames with nan values
+
+    """
     trace_array = np.vstack(trace_df.trace.values)
     
     # Check if there are too many nan frames or cells with too many nan frames
@@ -303,7 +329,7 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
 
     # Label axes
     num_cell = corr_matrices[inds[0]].shape[0]
-    interval = 100 if num_cell>300 else 50
+    interval = 100 if num_cell > 300 else 50
     xy_label_pos_ref = xy_label_pos_list[inds[0]]
     xy_labels_ref = xy_labels_list[inds[0]]
     for i in range(num_rows):

@@ -6,17 +6,35 @@ from pathlib import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.cluster.hierarchy import dendrogram, linkage
 import scipy.cluster.hierarchy as hierarchy
-from scipy.spatial.distance import pdist, squareform
-from sklearn.cluster import SpectralClustering
-from sklearn.decomposition import PCA
 from brain_observatory_analysis.ophys import correlation_analysis as ca
 from brain_observatory_analysis.ophys import raster_plot as rp
-from brain_observatory_analysis.ophys import data_formatting as df
 from brain_observatory_analysis.utilities import data_utils as du
 
 
 def get_task_df_list(base_dir, mouse_id, project_code=None):
-    df_fn_list = glob.glob(str(base_dir / mouse_id / f'*_task_trace_df.pkl'))
+    """Get task dataframes from a mouse.
+    
+    Parameters
+    ----------
+    base_dir : str or Path
+        Base directory of the data.
+    mouse_id : str
+        Mouse ID.
+    project_code : str, optional
+        Project code of the data. The default is None.
+
+    Returns
+    -------
+    task_df_list : list
+        List of task dataframes.
+    concat_df_list : list
+        List of concatenated response dataframes.
+    session_names : list
+        List of session names.
+    session_types : list
+        List of session types.
+    """
+    df_fn_list = glob.glob(str(base_dir / mouse_id / '*_task_trace_df.pkl'))
     trace_df_fn_list = []
     concat_df_fn_list = []
     for df_fn in df_fn_list:
@@ -26,7 +44,7 @@ def get_task_df_list(base_dir, mouse_id, project_code=None):
             trace_df_fn_list.append(df_fn)
     concat_df_fn_list = np.sort(concat_df_fn_list)
     trace_df_fn_list = np.sort(trace_df_fn_list)
-    
+
     trace_df_list = []
     for fn in trace_df_fn_list:
         trace_df = pd.read_pickle(fn)
@@ -67,42 +85,74 @@ def get_task_df_list(base_dir, mouse_id, project_code=None):
                             session_types.append(tt)
                 else:
                     session_types.append('Unknown')
-        
+
     # Concatenated traces
     concat_df_list = []
     for fn in concat_df_fn_list:
         concat_df = pd.read_pickle(fn)
         concat_df_list.append(concat_df)
-    
     return trace_df_list, concat_df_list, session_names, session_types
 
 
 def draw_session_trace_clustering(trace_array_std, cre_line, mouse_id, session_type,
-                                  method='ward', metric='euclidean', num_clusters=10):
-    fig, ax = plt.subplots(3,1, figsize=(6, 12))
-    Z_raster = linkage(trace_array_std, method=method, metric=metric)
-    ddata_raster = dendrogram(Z_raster, ax=ax[0])
-    leaves_raster = ddata_raster['leaves']
+                                  method='ward', metric='euclidean', num_clusters=10,
+                                  vmin=-2, vmax=3):
+    """Draw dendrogram and raster plot of session traces.
 
-    dendrogram(Z_raster, p=num_clusters, truncate_mode='lastp', ax=ax[1]);
+    Parameters
+    ----------
+    trace_array_std : array
+        Standardized trace array.
+    cre_line : str
+        Cre line of the mouse.
+    mouse_id : str
+        Mouse ID.
+    session_type : str
+        Session type.
+    method : str, optional
+        Method of hierarchical clustering. The default is 'ward'.
+    metric : str, optional
+        Metric of hierarchical clustering. The default is 'euclidean'.
+    num_clusters : int, optional
+        Number of clusters. The default is 10.
+    vmin : float, optional
+        Minimum value of the colormap. The default is -2.
+    vmax : float, optional
+        Maximum value of the colormap. The default is 3.
 
-    cluster_raster = hierarchy.fcluster(Z_raster, num_clusters, criterion='maxclust') - 1
-    num_cell = len(cluster_raster)
-    ordered_cluster_raster = cluster_raster[leaves_raster]
-    vmin=-2
-    vmax=3
-    ax[2].imshow(trace_array_std[leaves_raster,:], aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the dendrogram and raster plot.
+    cluster : np.ndarray
+        Cluster ID of each cell.
+    leaves: np.ndarray
+        Indicating the order of cells.
+
+    """
+    fig, ax = plt.subplots(3, 1, figsize=(6, 12))
+    Z = linkage(trace_array_std, method=method, metric=metric)
+    ddata = dendrogram(Z, ax=ax[0])
+    leaves = ddata['leaves']
+
+    R = dendrogram(Z, p=num_clusters, truncate_mode='lastp', ax=ax[1])  # noqa: F841
+
+    cluster = hierarchy.fcluster(Z, num_clusters, criterion='maxclust') - 1
+    num_cell = len(cluster)
+    ordered_cluster = cluster[leaves]
+
+    ax[2].imshow(trace_array_std[leaves, :], aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
     ax[2].set_yticks([])
     ax[2].set_xlabel('Frame #')
     divider = make_axes_locatable(ax[2])
     cax = divider.append_axes("left", size="5%", pad=0)
     # bar showing the cluster in cax
     for ci in range(0, num_clusters):
-        cax.bar(0, num_cell - len(np.where(ordered_cluster_raster<ci)[0]), color='C{}'.format(ci), width=1)
-        ax[2].axhline(y=len(np.where(ordered_cluster_raster<ci)[0]), color='k', linestyle='--', linewidth=0.5)
+        cax.bar(0, num_cell - len(np.where(ordered_cluster < ci)[0]), color='C{}'.format(ci), width=1)
+        ax[2].axhline(y=len(np.where(ordered_cluster < ci)[0]), color='k', linestyle='--', linewidth=0.5)
     cax.set_yticks([])
     cax.set_xticks([])
-    cax.set_ylim(0, len(ordered_cluster_raster))
+    cax.set_ylim(0, len(ordered_cluster))
     # remove bounding box of cax
     cax.spines['top'].set_visible(False)
     cax.spines['right'].set_visible(False)
@@ -110,10 +160,41 @@ def draw_session_trace_clustering(trace_array_std, cre_line, mouse_id, session_t
     cax.spines['left'].set_visible(False)
     fig.suptitle(f'{mouse_id}({cre_line}) {session_type} {method} {metric} {num_clusters} clusters')
     fig.tight_layout()
-    return fig, cluster_raster, leaves_raster
+    return fig, cluster, leaves
 
 
 def get_dendogram_and_fig(trace_df, cre_line, mouse_id, session_type):
+    """Get dendrogram and figure of the session traces.
+
+    Parameters
+    ----------
+    trace_df : pandas.DataFrame
+        DataFrame of the session traces.
+    cre_line : str
+        Cre line of the mouse.
+    mouse_id : str
+        Mouse ID.
+    session_type : str
+        Session type.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the dendrogram and raster plot.
+    cluster : np.ndarray
+        Cluster ID of each cell.
+    leaves: np.ndarray
+        Indicating the order of cells.
+    trace_array_std : np.ndarray
+        Standardized trace array.
+    trace_array_std_nonan: np.ndarray
+        Standardized trace array without NaN frames.
+    keep_ind : np.ndarray
+        Indices of the cells that are kept.
+    keep_frame : np.ndarray
+        Indices of the frames that are kept.
+    """
+
     trace_array, remove_ind, nan_frame_ind = ca.get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0)
     if len(remove_ind) > 0:
         trace_array_nonan = np.delete(trace_array, remove_ind, axis=0)
@@ -145,6 +226,31 @@ def get_dendogram_and_fig(trace_df, cre_line, mouse_id, session_type):
 
 
 def plot_cluster_distribution(trace_df, keep_ind, cluster, region_depth_list_template, cre_line, mouse_id, session_type):
+    """Plot the distribution of clusters in each region and depth.
+
+    Parameters
+    ----------
+    trace_df : pandas.DataFrame
+        DataFrame of the session traces.
+    keep_ind : np.ndarray
+        Indices of the cells that are kept.
+    cluster : np.ndarray
+        Cluster ID of each cell.
+    region_depth_list_template : list
+        List of the region and depth of each cell.
+    cre_line : str
+        Cre line of the mouse.
+    mouse_id : str
+        Mouse ID.
+    session_type : str
+        Session type.
+    
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the distribution of clusters in each region and depth.
+    """
+    
     region_depth = trace_df.apply(lambda x: f'{x.targeted_structure}_{int(x.depth_order):02d}', axis=1)
     region_depth = region_depth.iloc[keep_ind]
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
@@ -170,6 +276,31 @@ def plot_cluster_distribution(trace_df, keep_ind, cluster, region_depth_list_tem
 
 def get_response_fig(cluster, concat_df_sorted_by_trace_df, keep_ind, trace_array_std,
                      cre_line, mouse_id, session_type):
+    """Get the figure of the mean response of each cluster.
+
+    Parameters
+    ----------
+    cluster : np.ndarray
+        Cluster ID of each cell.
+    concat_df_sorted_by_trace_df : pandas.DataFrame
+        DataFrame of the concatenated traces.
+    keep_ind : np.ndarray
+        Indices of the cells that are kept.
+    trace_array_std : np.ndarray
+        Standardized traces.
+    cre_line : str
+        Cre line of the mouse.
+    mouse_id : str
+        Mouse ID.
+    session_type : str
+        Session type.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the mean response of each cluster.
+    """
+
     mean_concat_trace = []
     mean_cluster_trace = []
     for i in range(np.max(cluster) + 1):
@@ -194,6 +325,27 @@ def get_response_fig(cluster, concat_df_sorted_by_trace_df, keep_ind, trace_arra
 
 
 def get_cluster_correlation_fig(mean_concat_trace, mean_cluster_trace, cre_line, mouse_id, session_type):
+    """Get the figure of the correlation of the mean response of each cluster.
+
+    Parameters
+    ----------
+    mean_concat_trace : list or np.ndarray
+        Mean response of each cluster.
+    mean_cluster_trace : list or np.ndarray
+        Mean response of each cluster.
+    cre_line : str
+        Cre line of the mouse.
+    mouse_id : str
+        Mouse ID.
+    session_type : str
+        Session type.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the correlation of the mean response of each cluster.
+    """
+
     cc_mean_concat_trace = np.corrcoef(np.asarray(mean_concat_trace))
     cc_mean_cluster_trace = np.corrcoef(np.asarray(mean_cluster_trace))
     # select upper triangle of the correlation matrix
@@ -212,7 +364,7 @@ def get_cluster_correlation_fig(mean_concat_trace, mean_cluster_trace, cre_line,
     ax[1].set_xlabel('Cluster #')
     divider = make_axes_locatable(ax[1])
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    # cbar = plt.colorbar(ax[1].images[0], cax=cax)
+    plt.colorbar(ax[1].images[0], cax=cax)
     fig.suptitle(f'{mouse_id}({cre_line}) {session_type} cluster correlations')
     fig.tight_layout()
 
@@ -220,6 +372,28 @@ def get_cluster_correlation_fig(mean_concat_trace, mean_cluster_trace, cre_line,
 
 
 def get_behavior(trace_df, cache):
+    """Get the behavior data using allensdk VisualBehaviorOphysProjectCache.
+
+    Parameters
+    ----------
+    trace_df : pandas.DataFrame
+        DataFrame of the traces including other information.
+    cache : allensdk.brain_observatory.behavior.behavior_project_cache.VisualBehaviorOphysProjectCache
+        VisualBehaviorOphysProjectCache object.
+
+    Returns
+    -------
+    trace_timepoints : np.ndarray
+        Timepoints of the traces. Interpolation will be performed on this timepoints.
+    lickrate_interp : np.ndarray
+        Interpolated lick rate.
+    running_interp : np.ndarray
+        Interpolated running speed.
+    pupil_interp : np.ndarray
+        Interpolated pupil diameter.
+    reward_timestamps : np.ndarray
+        Timestamps of rewards.
+    """
     oeid = trace_df.oeid.values[0]
     exp = cache.get_behavior_ophys_experiment(oeid)
     # trace_timepoints = trace_df.timepoints.values[0][keep_frame]
@@ -245,6 +419,39 @@ def get_behavior(trace_df, cache):
 def get_clutstered_trace(cluster, leaves, trace_array_std_nonan, trace_timepoints,
                          cre_line, mouse_id, session_type,
                          num_clusters=10, vmin=-2, vmax=3, sub_title_fontsize=10):
+    """Get the figure of the clustered traces.
+
+    Parameters
+    ----------
+    cluster : np.ndarray
+        Cluster ID of each cell.
+    leaves : np.ndarray
+        Order of the cells to draw the hierarchy.
+    trace_array_std_nonan : np.ndarray
+        Standardized trace array without nan.
+    trace_timepoints : np.ndarray
+        Timepoints of the traces. Interpolation will be performed on this timepoints.
+    cre_line : str
+        Cre line of the mouse. For figure title
+    mouse_id : str
+        Mouse ID. For figure title
+    session_type : str
+        Session type. For figure title
+    num_clusters : int, optional
+        Number of clusters, by default 10
+    vmin : float, optional
+        Minimum value of the colormap, by default -2
+    vmax : float, optional
+        Maximum value of the colormap, by default 3
+    sub_title_fontsize : int, optional
+        Fontsize of the sub title, by default 10
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the clustered traces.
+    """
+
     fig, ax = plt.subplots(figsize=(12, 8))
     num_cell = len(cluster)
     ordered_cluster_raster = cluster[leaves]
@@ -273,6 +480,47 @@ def get_clustered_trace_with_behavior(cluster, leaves, trace_array_std_nonan, tr
                                       lickrate_interp, running_interp, pupil_interp, rewards,
                                       cre_line, mouse_id, session_type,
                                       num_clusters=10, vmin=-2, vmax=3, sub_title_fontsize=10):
+    """Get the figure of the clustered traces with behavior.
+    
+    Parameters
+    ----------
+    cluster : np.ndarray
+        Cluster ID of each cell.
+    leaves : np.ndarray
+        Order of the cells in the hierarchy.
+    trace_array_std_nonan : np.ndarray
+        Standardized trace array without nan.
+    trace_timepoints : np.ndarray
+        Timepoints of the traces. Interpolation will be performed on this timepoints.
+    lickrate_interp : np.ndarray
+        Interpolated lickrate.
+    running_interp : np.ndarray
+        Interpolated running speed.
+    pupil_interp : np.ndarray
+        Interpolated pupil diameter.
+    rewards : np.ndarray
+        Reward timestamps.
+    cre_line : str
+        Cre line of the mouse. For figure title
+    mouse_id : str
+        Mouse ID. For figure title
+    session_type : str
+        Session type. For figure title
+    num_clusters : int, optional
+        Number of clusters, by default 10
+    vmin : float, optional
+        Minimum value of the colormap, by default -2
+    vmax : float, optional
+        Maximum value of the colormap, by default 3
+    sub_title_fontsize : int, optional
+        Fontsize of the sub title, by default 10
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        Figure of the clustered traces with behavior.
+    """
+
     fig, ax = plt.subplots(figsize=(12, 8))
     num_cell = len(cluster)
     ordered_cluster_raster = cluster[leaves]
@@ -351,6 +599,55 @@ def get_clustered_trace_with_behavior(cluster, leaves, trace_array_std_nonan, tr
 def calculate_correlation_between_cluster_and_behavior(trace_array_std_nonan, num_clusters, trace_timepoints,
                                                        mean_cluster_trace, running_interp, pupil_interp, lickrate_interp,
                                                        sliding_window_minute=5, interval_min=0.5, imaging_freq=10.7):
+    """ Calculate correlation between cluster and behavior
+
+    Parameters
+    ----------
+    trace_array_std_nonan: np.ndarray
+        z-scored trace array with nans removed
+    num_clusters: int
+        number of clusters
+    trace_timepoints: np.ndarray
+        timepoints for trace array
+    mean_cluster_trace: np.ndarray
+        mean trace for each cluster
+    running_interp: np.ndarray
+        interpolated running speed
+    pupil_interp: np.ndarray
+        interpolated pupil diameter
+    lickrate_interp: np.ndarray
+        interpolated lick rate
+    sliding_window_minute: float, optional
+        sliding window for calculating correlation (in minutes), by default 5
+    interval_min: float, optional
+        interval between sliding windows (in minutes), by default 0.5
+    imaging_freq: float, optional
+        imaging frequency (in Hz), by default 10.7
+
+    Returns
+    -------
+    corr_timepoints: np.ndarray
+        timepoints for correlation
+    corr_with_running: np.ndarray
+        correlation between cluster trace and running speed
+    corr_with_pupil: np.ndarray
+        correlation between cluster trace and pupil diameter
+    corr_with_lick: np.ndarray
+        correlation between cluster trace and lick rate
+    corr_running_pupil: np.ndarray
+        correlation between running speed and pupil diameter
+    corr_running_lick: np.ndarray
+        correlation between running speed and lick rate
+    corr_pupil_lick: np.ndarray
+        correlation between pupil diameter and lick rate
+    corr_mean_running: np.ndarray
+        correlation between grand mean trace and running speed
+    corr_mean_pupil: np.ndarray
+        correlation between grand mean trace and pupil diameter
+    corr_mean_lick: np.ndarray
+        correlation between grand mean trace and lick rate
+    """
+    
     sliding_window = int(sliding_window_minute * 60 * imaging_freq)  # in frames (about 5 min)
     interval = int(interval_min * 60 * imaging_freq)  # in frames (about 30 sec)
     mean_trace = np.mean(trace_array_std_nonan, axis=0)
@@ -385,13 +682,55 @@ def calculate_correlation_between_cluster_and_behavior(trace_array_std_nonan, nu
         corr_mean_lick[ti] = np.corrcoef(mean_trace[start_ind:end_ind], lickrate_interp[start_ind:end_ind])[0, 1]
     
     corr_timepoints = trace_timepoints[sliding_window // 2:-sliding_window // 2 - interval:interval]
-    return corr_timepoints, corr_with_running, corr_with_pupil, corr_with_lick, corr_running_pupil, corr_running_lick, corr_pupil_lick, corr_mean_running, corr_mean_pupil, corr_mean_lick
+    return corr_timepoints, corr_with_running, corr_with_pupil, corr_with_lick, \
+        corr_running_pupil, corr_running_lick, corr_pupil_lick, \
+        corr_mean_running, corr_mean_pupil, corr_mean_lick
 
 
 def plot_all_correlations(corr_timepoints, num_clusters, corr_with_running, corr_with_pupil, corr_with_lick,
                           corr_running_pupil, corr_running_lick, corr_pupil_lick, pupil_interp,
                           corr_mean_running, corr_mean_pupil, corr_mean_lick,
                           cre_line, mouse_id, session_type):
+    """ Plot all correlations
+    Parameters
+    ----------
+    corr_timepoints: np.ndarray
+        timepoints for correlation
+    num_clusters: int
+        number of clusters
+    corr_with_running: np.ndarray
+        correlation between each cluster and running speed
+    corr_with_pupil: np.ndarray
+        correlation between each cluster and pupil diameter
+    corr_with_lick: np.ndarray
+        correlation between each cluster and lick rate
+    corr_running_pupil: np.ndarray
+        correlation between running speed and pupil diameter
+    corr_running_lick: np.ndarray
+        correlation between running speed and lick rate
+    corr_pupil_lick: np.ndarray
+        correlation between pupil diameter and lick rate
+    pupil_interp: np.ndarray
+        interpolated pupil diameter
+    corr_mean_running: np.ndarray
+        correlation between mean trace and running speed
+    corr_mean_pupil: np.ndarray
+        correlation between mean trace and pupil diameter
+    corr_mean_lick: np.ndarray
+        correlation between mean trace and lick rate
+    cre_line: str
+        cre line. For title
+    mouse_id: str
+        mouse id. For title
+    session_type: str
+        session type. For title
+
+    Returns
+    -------
+    fig: matplotlib.pyplot.figure
+        figure handle
+    """
+
     fig, ax = plt.subplots(5, 1, figsize=(12, 12), sharex=True)
     for ci in range(num_clusters):
         ax[0].plot(corr_timepoints, corr_with_running[ci], label=f'cluster {ci}')
@@ -431,8 +770,24 @@ def plot_all_correlations(corr_timepoints, num_clusters, corr_with_running, corr
 
 
 def plot_pca_with_corr(pca_coord, pca_axes, corr_with_behav, ax, colorbar_label):
+    """ Plot PCA with correlation.
+    Use this to plot in an axis that is already created.
+
+    Parameters
+    ----------
+    pca_coord: np.ndarray
+        PCA coordinates
+    pca_axes: list
+        PCA axes to plot
+    corr_with_behav: np.ndarray
+        correlation with behavior
+    ax: matplotlib.pyplot.axis
+        axis handle
+    colorbar_label: str
+        label for colorbar
+    """
     im = ax.scatter(pca_coord[:, pca_axes[0]], pca_coord[:, pca_axes[1]], c=corr_with_behav, cmap='coolwarm', 
-               vmin=np.nanmin(corr_with_behav), vmax=np.nanmax(corr_with_behav))
+                    vmin=np.nanmin(corr_with_behav), vmax=np.nanmax(corr_with_behav))
     ax.set_xlabel(f'PC{pca_axes[0]+1}')
     ax.set_ylabel(f'PC{pca_axes[1]+1}')
     ax.set_aspect('equal')
@@ -443,25 +798,71 @@ def plot_pca_with_corr(pca_coord, pca_axes, corr_with_behav, ax, colorbar_label)
 
 
 def plot_pca_with_corr_behavior(pca_coord, pca_axes_ind,
-                       mean_corrcoef, corr_with_running, corr_with_pupil, corr_with_lick,
-                       cre_line, mouse_id, session_type):
-    fig, ax = plt.subplots(2,2, figsize=(12,10))
-    plot_pca_with_corr(pca_coord, pca_axes_ind, mean_corrcoef, ax[0,0], 'Mean correlation coefficient')
-    plot_pca_with_corr(pca_coord, pca_axes_ind, corr_with_running, ax[0,1], 'Correlation with running')
+                                mean_corrcoef, corr_with_running, corr_with_pupil, corr_with_lick,
+                                cre_line, mouse_id, session_type):
+    """ Plot PCA with correlation to behavior.
+    Use this to plot in an axis that is already created.
+
+    Parameters
+    ----------
+    pca_coord: np.ndarray
+        PCA coordinates
+    pca_axes_ind: list
+        PCA axes to plot
+    mean_corrcoef: np.ndarray
+        mean correlation coefficient
+    corr_with_running: np.ndarray
+        correlation with running
+    corr_with_pupil: np.ndarray
+        correlation with pupil
+    corr_with_lick: np.ndarray
+        correlation with lickrate
+    cre_line: str
+        cre line. For title
+    mouse_id: str
+        mouse id. For title
+    session_type: str
+        session type. For title
+    """
+
+    fig, ax = plt.subplots(2, 2, figsize=(12, 10))
+    plot_pca_with_corr(pca_coord, pca_axes_ind, mean_corrcoef, ax[0, 0], 'Mean correlation coefficient')
+    plot_pca_with_corr(pca_coord, pca_axes_ind, corr_with_running, ax[0, 1], 'Correlation with running')
     if corr_with_pupil is not None:
-        plot_pca_with_corr(pca_coord, pca_axes_ind, corr_with_pupil, ax[1,0], 'Correlation with pupil')
-    plot_pca_with_corr(pca_coord, pca_axes_ind, corr_with_lick, ax[1,1], 'Correlation with lickrate')
+        plot_pca_with_corr(pca_coord, pca_axes_ind, corr_with_pupil, ax[1, 0], 'Correlation with pupil')
+    plot_pca_with_corr(pca_coord, pca_axes_ind, corr_with_lick, ax[1, 1], 'Correlation with lickrate')
     fig.suptitle(f'{mouse_id}({cre_line}) {session_type} PCA')
     fig.tight_layout()
     return fig
 
 
 def plot_varexp(trace_array_std_nonan, pca, cre_line, mouse_id, session_type):
-    num_pc_limit = min(300, trace_array_std_nonan.shape[0] - trace_array_std_nonan.shape[0]//10)
-    inset_num_pc = min(30, trace_array_std_nonan.shape[0]//10)
+    """ Plot variance explained by PCs.
+
+    Parameters
+    ----------
+    trace_array_std_nonan: np.ndarray
+        standardized trace array
+    pca: sklearn.decomposition.PCA
+        PCA object
+    cre_line: str
+        cre line. For title
+    mouse_id: str
+        mouse id. For title
+    session_type: str
+        session type. For title
+
+    Returns
+    -------
+    fig: matplotlib.pyplot.figure
+        figure handle
+    """
+
+    num_pc_limit = min(300, trace_array_std_nonan.shape[0] - trace_array_std_nonan.shape[0] // 10)
+    inset_num_pc = min(30, trace_array_std_nonan.shape[0] // 10)
     varexp_pc = pca.explained_variance_ratio_
-    pcs = np.arange(1, len(varexp_pc)+1)
-    fig, ax = plt.subplots(1,3, figsize=(10,3))
+    pcs = np.arange(1, len(varexp_pc) + 1)
+    fig, ax = plt.subplots(1, 3, figsize=(10, 3))
     ax[0].plot(pcs, np.cumsum(varexp_pc))
     ax[0].set_xlabel('# PCs')
     ax[0].set_ylabel('Cumulative variance explained')
@@ -470,7 +871,7 @@ def plot_varexp(trace_array_std_nonan, pca, cre_line, mouse_id, session_type):
     ax[1].set_ylabel('Cumulative variance explained')
     ax[2].loglog(pcs[:num_pc_limit], varexp_pc[:num_pc_limit])
     ax[2].set_aspect('equal')
-    ax[2].set_ybound(upper=1/10)
+    ax[2].set_ybound(upper=1 / 10)
     ax[2].set_xlabel('# PCs')
     ax[2].set_ylabel('Variance explained')
     fig.suptitle(f'{mouse_id}({cre_line}) {session_type} PCA Variance Explained')
@@ -480,6 +881,32 @@ def plot_varexp(trace_array_std_nonan, pca, cre_line, mouse_id, session_type):
 
 def plot_pca_loading_corr_with_behavior(pca, running_interp, pupil_interp, lickrate_interp,
                                         cre_line, mouse_id, session_type, num_pc=10):
+    """ Plot PCA loading correlation with behavior.
+
+    Parameters
+    ----------
+    pca: sklearn.decomposition.PCA
+        PCA object
+    running_interp: np.ndarray
+        interpolated running
+    pupil_interp: np.ndarray
+        interpolated pupil
+    lickrate_interp: np.ndarray
+        interpolated lickrate
+    cre_line: str
+        cre line. For title
+    mouse_id: str
+        mouse id. For title
+    session_type: str
+        session type. For title
+    num_pc: int, optional
+        number of PCs to plot, by default 10
+
+    Returns
+    -------
+    fig: matplotlib.pyplot.figure
+        figure handle
+    """
     # Calculate correlation with running, pupil, lickrate, for each PC loading
     corr_pc_vs_running = np.zeros(num_pc)
     corr_pc_vs_pupil = np.zeros(num_pc)
@@ -491,16 +918,16 @@ def plot_pca_loading_corr_with_behavior(pca, running_interp, pupil_interp, lickr
             corr_pc_vs_pupil[i] = np.corrcoef(pca.components_[i, :], pupil_interp)[0, 1]
         corr_pc_vs_lickrate[i] = np.corrcoef(pca.components_[i, :], lickrate_interp)[0, 1]
         
-    fig, ax = plt.subplots(1,2,figsize=(15,5))
-    ax[0].plot(range(1,11), corr_pc_vs_running, label='running')
-    ax[0].plot(range(1,11), corr_pc_vs_pupil, label='pupil')
-    ax[0].plot(range(1,11), corr_pc_vs_lickrate, label='lickrate')
+    fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+    ax[0].plot(range(1, 11), corr_pc_vs_running, label='running')
+    ax[0].plot(range(1, 11), corr_pc_vs_pupil, label='pupil')
+    ax[0].plot(range(1, 11), corr_pc_vs_lickrate, label='lickrate')
     ax[0].set_xlabel('PC #')
     ax[0].set_ylabel('Correlation')
 
-    ax[1].plot(range(1,11), np.abs(corr_pc_vs_running), label='running')
-    ax[1].plot(range(1,11), np.abs(corr_pc_vs_pupil), label='pupil')
-    ax[1].plot(range(1,11), np.abs(corr_pc_vs_lickrate), label='lickrate')
+    ax[1].plot(range(1, 11), np.abs(corr_pc_vs_running), label='running')
+    ax[1].plot(range(1, 11), np.abs(corr_pc_vs_pupil), label='pupil')
+    ax[1].plot(range(1, 11), np.abs(corr_pc_vs_lickrate), label='lickrate')
     ax[1].legend()
     ax[1].set_xlabel('PC #')
     ax[1].set_ylabel('|Correlation|')
