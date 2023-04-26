@@ -10,10 +10,10 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
     # Check if there are too many nan frames or cells with too many nan frames
     num_cell = len(trace_df)
     num_nan_frames_threshold = int(trace_array.shape[1] * nan_frame_prop_threshold)
-    nan_frames = np.where(np.isnan(trace_array).sum(axis=0)>0)[0]
+    nan_frames = np.where(np.isnan(trace_array).sum(axis=0) > 0)[0]
     num_nan_frames = len(nan_frames)
 
-    remove_ind = np.zeros(0,dtype=np.uint32)
+    remove_ind = np.zeros(0, dtype=np.uint32)
     if num_nan_frames > 0:
         if num_nan_frames > num_nan_frames_threshold:
             num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
@@ -25,7 +25,7 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
                 print(f"{num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
                 remove_ind = ind_many_nan_frames
                 valid_trace_array = np.delete(trace_array, remove_ind, axis=0)
-                nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0)>0)[0]
+                nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0) > 0)[0]
                 num_nan_frames = len(nan_frames)
                 print(f"{num_nan_frames} frames with nan values")
         else:
@@ -67,8 +67,8 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
         Indices of cells to be removed due to large number of nan frames
     """
     trace_array, remove_ind, nan_frame_ind = get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold, nan_cell_prop_threshold)
-    trace_array = np.delete(trace_array, remove_ind, axis=0)
-    trace_array = np.delete(trace_array, nan_frame_ind, axis=1)
+    assert len(remove_ind) == 0
+    assert len(nan_frame_ind) == 0
 
     corr = np.corrcoef(trace_array)
 
@@ -78,6 +78,8 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     corr_ordered = corr[mean_corr_sorted_ind, :][:, mean_corr_sorted_ind]
 
     # trace_df is grouped by experiemnts, so we can get the number of cells in each experiment
+    if ('cell_specimen_id' in trace_df.keys()) and (None in trace_df.cell_specimen_id.values):
+        trace_df.drop(columns=['cell_specimen_id'], inplace=True)
     numcell_cumsum = np.cumsum([x[0] for x in trace_df.groupby(['oeid']).count().values])
     xy_ticks = np.insert(numcell_cumsum, 0, 0)
     xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first().targeted_structure.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
