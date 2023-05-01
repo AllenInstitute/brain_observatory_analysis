@@ -5,7 +5,7 @@ from typing import Union
 import json
 import datetime
 
-from mindscope_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
+from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 # TODO: change to brain_observatory utilities
@@ -57,7 +57,8 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           data_type: str = "dff",
                                           load_from_file: bool = True,
                                           save_to_file: bool = False,
-                                          multi:bool = False) -> pd.DataFrame:
+                                          multi: bool = False,
+                                          save_expt_group_msrdf: Union[str, Path] = None) -> pd.DataFrame:
     """
     Get mean stimulus response for each cell in the experiment group
 
@@ -77,6 +78,8 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
         If True, save to file
     multi: bool
         If True, use multiprocessing
+    save_expt_group_msrdf: Union[str,Path]
+        If provided, save the experiment group mean stimulus response dataframe to file
 
 
     Returns
@@ -149,6 +152,17 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
 
     merged_mdfs = (mdfs.merge(expt_table, on=["ophys_experiment_id"])
                        .merge(oct, on=["cell_roi_id"]))
+
+    if save_expt_group_msrdf is not None:
+        filename = f"{expt_group.group_name}_msrdf_{event_type}_{data_type}.pkl"
+
+        out_path = Path(save_expt_group_msrdf / filename)
+
+        # check if file exists, dont overwrite
+        if out_path.exists():
+            raise FileExistsError(f"File already exists: {out_path}")
+        merged_mdfs.to_pickle(out_path)
+        print(f"SAVED: mean stimulus response dataframe to: {out_path}")
 
     return merged_mdfs
 

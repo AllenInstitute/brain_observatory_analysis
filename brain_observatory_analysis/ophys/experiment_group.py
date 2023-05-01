@@ -65,7 +65,6 @@ class ExperimentGroup():
             else:
                 self.group_name = "NamelessGroup"
 
-
         if self.filters:
             # make sure each value in filters is a list
             self.filters = {k: [v] if not isinstance(v, (list, np.ndarray))
