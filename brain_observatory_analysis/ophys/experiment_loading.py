@@ -15,9 +15,9 @@ import brain_observatory_analysis.utilities.file_utils as fu
 
 from allensdk.brain_observatory.behavior.behavior_project_cache import \
     VisualBehaviorOphysProjectCache
-import mindscope_qc.utilities.experiment_table_utils as etu
+import brain_observatory_qc.utilities.experiment_table_utils as etu
 
-from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
+from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
      BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
     import BehaviorOphysExperiment

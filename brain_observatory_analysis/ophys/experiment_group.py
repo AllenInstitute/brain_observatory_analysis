@@ -3,7 +3,7 @@ import numpy as np
 
 from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
-# from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
+# from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
 #     BehaviorOphysExperimentDev
 # from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
 #     import BehaviorOphysExperiment
@@ -22,6 +22,8 @@ class ExperimentGroup():
         use BehaviorOphysExperimentDev object
     test_mode : bool, optional
         load only 2 experiments, by default False
+    group_name : str, optional
+        name of group, by default None. Useful for filenames
 
     Attributes
     ----------
@@ -39,7 +41,8 @@ class ExperimentGroup():
                  dev: bool = False,
                  skip_eye_tracking: bool = False,
                  test_mode: bool = False,
-                 verbose: bool = True):
+                 group_name: str = None,
+                 verbose: bool = False):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
         self.expt_list_to_load = self.expt_table_to_load.index.tolist()
@@ -52,6 +55,16 @@ class ExperimentGroup():
         self.grp_ophys_cells_table = pd.DataFrame()
         self.skip_eye_tracking = skip_eye_tracking
         self.verbose = verbose
+        self.group_name = group_name
+
+        # single mouse is a sensible group name
+        if group_name is None:
+            mouse_names = self.expt_table_to_load["mouse_name"].unique()
+            if len(mouse_names) == 1:
+                self.group_name = mouse_names[0]
+            else:
+                self.group_name = "NamelessGroup"
+
 
         if self.filters:
             # make sure each value in filters is a list
