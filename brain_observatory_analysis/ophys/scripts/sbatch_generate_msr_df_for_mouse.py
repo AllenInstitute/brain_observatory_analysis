@@ -40,8 +40,8 @@ if __name__ == '__main__':
                 print(f'CLUSTER JOB: {event_type} {data_type}, {mouse_name}, job count = {job_count}')
 
                 job_title = f'msr_df_{event_type}_{data_type}_{mouse_name}'
-                walltime = '01:00:00'
-                mem = '5G'
+                walltime = '02:00:00'
+                mem = '100gb'
                 # tmp = '3G',
                 job_id = Slurm.JOB_ARRAY_ID
                 job_array_id = Slurm.JOB_ARRAY_MASTER_ID
