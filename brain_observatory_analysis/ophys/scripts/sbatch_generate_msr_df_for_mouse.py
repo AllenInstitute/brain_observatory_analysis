@@ -8,10 +8,10 @@ from brain_observatory_analysis.ophys.experiment_loading import start_lamf_analy
 ROOT_DIR = Path("//allen/programs/mindscope/workgroups/learning/analysis_data_cache/msrdf")
 
 if __name__ == '__main__':
-    python_executable = "//data/learning/mattd/miniconda3/envs/dev/bin/python"
+    python_executable = "//home/anaconda3/envs/mfish_glm/bin/python"
 
     # py file
-    python_file = Path('//home/matt.davis/code/mjd_dev/scripts/generate_msr_df_for_mouse.py')  # update to brain_observatory_qc
+    python_file = Path('//home/iryna.yavorska/code/brain_observatory_analysis/brain_observatory_analysis/ophys/scripts/generate_msr_df_for_mouse.py')  # update to brain_observatory_qc
     job_dir = ROOT_DIR 
     stdout_location = job_dir / 'job_records'
     stdout_location.mkdir(parents=True, exist_ok=True)
@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     # Copper
     # mouse_names = ["Copper", "Silicon", "Titanium", "Bronze", "Gold", "Silver", "Mercury", "Aluminum", "Iron", "Cobalt"]
-    mouse_names = ["Copper"]
+    mouse_names = ["Silver", "Gold", "Silicon"]
     expts.mouse_name = pd.Categorical(expts.mouse_name, categories=mouse_names, ordered=True)
     expts = expts.sort_values(by="mouse_name")
     expt_ids = expts.index.values
