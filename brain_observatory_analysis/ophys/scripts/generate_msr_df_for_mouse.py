@@ -6,7 +6,7 @@ from brain_observatory_analysis.ophys.experiment_group import ExperimentGroup
 import brain_observatory_analysis.ophys.stimulus_response as sr
 # (add mjd_dev to path)
 import sys
-sys.path.append("/home/matt.davis/code/mjd_dev/scripts")
+sys.path.append("//home/iryna.yavorska/code/brain_observatory_analysis/brain_observatory_analysis/ophys/scripts")
 import coreg_utils as cu
 
 import stim_response_plots as stp
@@ -18,7 +18,7 @@ import argparse
 # event_type arg
 parser = argparse.ArgumentParser()
 parser.add_argument("--event_type", type=str, default="changes")
-parser.add_argument("--data_type", type=str, default="dff")
+parser.add_argument("--data_type", type=str, default="filtered_events")
 
 def fill_csid_with_rows(expt_group):
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     fill_csid_with_rows(expt_group)
 
     msrdf_path = Path("//allen/programs/mindscope/workgroups/learning/analysis_data_cache/msrdf")
-    data_types = ['events', 'dff', 'filtered_events']
+    data_types = ['filtered_events']
     event_types = ["omissions", "changes"]
 
     for data_type in data_types:
