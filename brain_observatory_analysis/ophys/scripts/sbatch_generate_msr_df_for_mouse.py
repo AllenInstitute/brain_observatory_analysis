@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     # Copper
     # mouse_names = ["Copper", "Silicon", "Titanium", "Bronze", "Gold", "Silver", "Mercury", "Aluminum", "Iron", "Cobalt"]
-    
+    mouse_names = ["Silver", "Gold", "Silicon"]
     expts.mouse_name = pd.Categorical(expts.mouse_name, categories=mouse_names, ordered=True)
     expts = expts.sort_values(by="mouse_name")
     expt_ids = expts.index.values
@@ -28,8 +28,8 @@ if __name__ == '__main__':
 
     job_count = 0
     print('number of jobs = {}'.format(len(expt_ids)))
+
     
-    mouse_names = ["Silver", "Gold", "Silicon"]
     data_types = ['dff', 'events', 'filtered_events']
     event_types = ["changes", "omissions"]
 
