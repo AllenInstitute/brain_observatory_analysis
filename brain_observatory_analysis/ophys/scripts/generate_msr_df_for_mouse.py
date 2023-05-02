@@ -19,6 +19,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("--event_type", type=str, default="changes")
 parser.add_argument("--data_type", type=str, default="filtered_events")
+parser.add_argument("--mouse_name", type=str, default="Copper")
 
 def fill_csid_with_rows(expt_group):
 
@@ -46,10 +47,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     event_type = args.event_type
     data_type = args.data_type
+    mouse_name = args.mouse_name
 
     expt_table = start_lamf_analysis(verbose=False)
 
-    filters = {"mouse_name": "Copper", "targeted_structure": "VISp"}
+    filters = {"mouse_name": mouse_name, "experience_level": ['Familiar', 'Novel 1', 'Novel >1']}
     expt_group = ExperimentGroup(expt_table_to_load=expt_table,
                                  filters=filters, dev=True, group_name="copper")
     expt_group.load_experiments()
