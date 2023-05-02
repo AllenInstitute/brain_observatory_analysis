@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     expt_table = start_lamf_analysis(verbose=False)
 
-    filters = {"mouse_name": mouse_name, "experience_level": ['Familiar', 'Novel 1', 'Novel >1']}
+    filters = {"mouse_name": mouse_name}
     expt_group = ExperimentGroup(expt_table_to_load=expt_table,
                                  filters=filters, dev=True, group_name="copper")
     expt_group.load_experiments()
