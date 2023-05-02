@@ -19,12 +19,46 @@ import hashlib
 
 import pickle
 
+import multiprocessing as mp
+
+
+def _get_mean_stim_response_df(expt, event_type, data_type, load_from_file, save_to_file):
+            # TODO: MOVE TO DEV
+    try:
+        expt_id = expt.ophys_experiment_id
+        expt.extended_stimulus_presentations = \
+            get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
+                                                expt.licks,
+                                                expt.rewards,
+                                                expt.running_speed,
+                                                expt.eye_tracking)
+
+        sdf = _get_stimulus_response_df(expt,
+                                        event_type=event_type,
+                                        data_type=data_type,
+                                        load_from_file=load_from_file,
+                                        save_to_file=save_to_file)
+        
+        sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
+        mdf = get_standard_mean_df(sdf)
+        mdf["ophys_experiment_id"] = expt_id
+        mdf["event_type"] = event_type
+        mdf["data_type"] = data_type
+
+    except Exception as e:
+        print(f"Failed to get stim response for: {expt_id}, {e}")
+        mdf = pd.DataFrame()
+    
+    return mdf
+
 
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                                           event_type: str = "changes",
                                           data_type: str = "dff",
-                                          conditions: list = [],
-                                          load_from_file: bool = True) -> pd.DataFrame:
+                                          load_from_file: bool = True,
+                                          save_to_file: bool = False,
+                                          multi: bool = False,
+                                          save_expt_group_msrdf: Union[str, Path] = None) -> pd.DataFrame:
     """
     Get mean stimulus response for each cell in the experiment group
 
@@ -35,11 +69,18 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
     event_type: str
         The event type ["changes", "omissions", "images", "all"]
         see get_stimulus_response_df() for more details
-    conditions: list of columns in stimulus_response_df to group over before taking the mean
-        ex: ['cell_specimen_id, "image_name"] will give the mean response (for the given event_type)
-        for each image in each experiment 
-        If conditions is an emtpy list, "standard" mean df will be calculated, which is simply the 
-        average across all events provided in "event_type". 
+    data_type: str
+        The data type ["dff", "events", "filtered_events"]
+        see get_stimulus_response_df() for more details
+    load_from_file: bool
+        If True, load from file if available
+    save_to_file: bool
+        If True, save to file
+    multi: bool
+        If True, use multiprocessing
+    save_expt_group_msrdf: Union[str,Path]
+        If provided, save the experiment group mean stimulus response dataframe to file
+
 
     Returns
     -------
@@ -56,37 +97,48 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                             correlation_values
         """
 
+
+
+
+
     mdfs = []
-    for expt_id, expt in expt_group.experiments.items():
-        try:    
 
-            # TODO: MOVE TO DEV
-            expt.extended_stimulus_presentations = \
-                get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
-                                                    expt.licks,
-                                                    expt.rewards,
-                                                    expt.running_speed,
-                                                    expt.eye_tracking)
-
-            sdf = _get_stimulus_response_df(expt,
-                                            event_type=event_type,
-                                            data_type=data_type,
-                                            load_from_file=load_from_file,
-                                            save_to_file=False)
+    if multi:
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            mdfs = pool.starmap(_get_mean_stim_response_df,
+                                [(expt, event_type, data_type, load_from_file, save_to_file) for expt_id, expt in expt_group.experiments.items()])
             
-            sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
-            if len(conditions) == 0:
+        mdfs = pd.concat(mdfs).reset_index(drop=True)
+
+    else:
+        for expt_id, expt in expt_group.experiments.items():
+            try:    
+
+                # TODO: MOVE TO DEV
+                expt.extended_stimulus_presentations = \
+                    get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
+                                                        expt.licks,
+                                                        expt.rewards,
+                                                        expt.running_speed,
+                                                        expt.eye_tracking)
+
+                sdf = _get_stimulus_response_df(expt,
+                                                event_type=event_type,
+                                                data_type=data_type,
+                                                load_from_file=load_from_file,
+                                                save_to_file=save_to_file)
+                
+                sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
                 mdf = get_standard_mean_df(sdf)
-            else: 
-                mdf = get_mean_df(sdf, conditions)
-            mdf["ophys_experiment_id"] = expt_id
-            mdf["event_type"] = event_type
-            mdf["data_type"] = data_type
-            mdfs.append(mdf)
-        except Exception as e:
-            print(f"Failed to get stim response for: {expt_id}, {e}")
-    print('Found {} stim responses df'.format(len(mdfs))) 
-    mdfs = pd.concat(mdfs).reset_index(drop=True)
+                mdf["ophys_experiment_id"] = expt_id
+                mdf["event_type"] = event_type
+                mdf["data_type"] = data_type
+                mdfs.append(mdf)
+            except Exception as e:
+                print(f"Failed to get stim response for: {expt_id}, {e}")
+                continue
+    
+        mdfs = pd.concat(mdfs).reset_index(drop=True)
 
     # cells_filtered has expt_table info that is useful
     expt_table = expt_group.expt_table
@@ -100,6 +152,17 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
 
     merged_mdfs = (mdfs.merge(expt_table, on=["ophys_experiment_id"])
                        .merge(oct, on=["cell_roi_id"]))
+
+    if save_expt_group_msrdf is not None:
+        filename = f"{expt_group.group_name}_msrdf_{event_type}_{data_type}.pkl"
+
+        out_path = Path(save_expt_group_msrdf / filename)
+
+        # check if file exists, dont overwrite
+        if out_path.exists():
+            raise FileExistsError(f"File already exists: {out_path}")
+        merged_mdfs.to_pickle(out_path)
+        print(f"SAVED: mean stimulus response dataframe to: {out_path}")
 
     return merged_mdfs
 

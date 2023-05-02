@@ -203,7 +203,8 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
                      multi: bool = True,
                      return_failed=False,
                      dev=False,
-                     skip_eye_tracking=False) -> dict:
+                     skip_eye_tracking=False,
+                     verbose=True) -> dict:
     """Load expts from LIMS and return datasets, single or multi core
 
     Parameters

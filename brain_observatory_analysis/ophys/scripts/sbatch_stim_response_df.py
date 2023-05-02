@@ -34,9 +34,9 @@ if __name__ == '__main__':
     stdout_location.mkdir(parents=True, exist_ok=True)
 
     # oeids
-    expt_table = start_lamf_analysis()
-    for event_type in ["omissions", "changes"]:
+    for event_type in ["changes"]:
         for data_type in ["events", "filtered_events"]:
+            expt_table = start_lamf_analysis(verbose=False)
 
             if event_type == "omissions":
                 short_session_types = ["Familiar Images + omissions", "Novel Images + omissions", "Novel Images EXTINCTION"]

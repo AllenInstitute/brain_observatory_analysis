@@ -3,7 +3,7 @@ import numpy as np
 
 from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
-# from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
+# from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
 #     BehaviorOphysExperimentDev
 # from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
 #     import BehaviorOphysExperiment
@@ -22,6 +22,8 @@ class ExperimentGroup():
         use BehaviorOphysExperimentDev object
     test_mode : bool, optional
         load only 2 experiments, by default False
+    group_name : str, optional
+        name of group, by default None. Useful for filenames
 
     Attributes
     ----------
@@ -38,7 +40,9 @@ class ExperimentGroup():
                  filters: dict = {},
                  dev: bool = False,
                  skip_eye_tracking: bool = False,
-                 test_mode: bool = False):
+                 test_mode: bool = False,
+                 group_name: str = None,
+                 verbose: bool = False):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
         self.filters = filters
@@ -49,6 +53,16 @@ class ExperimentGroup():
         self.failed_to_load = []  # set after loading
         self.grp_ophys_cells_table = pd.DataFrame()
         self.skip_eye_tracking = skip_eye_tracking
+        self.verbose = verbose
+        self.group_name = group_name
+
+        # single mouse is a sensible group name
+        if group_name is None:
+            mouse_names = self.expt_table_to_load["mouse_name"].unique()
+            if len(mouse_names) == 1:
+                self.group_name = mouse_names[0]
+            else:
+                self.group_name = "NamelessGroup"
 
         if self.filters:
             # make sure each value in filters is a list
@@ -77,13 +91,23 @@ class ExperimentGroup():
                              multi=True,
                              return_failed=False,
                              dev=self.dev,
-                             skip_eye_tracking=self.skip_eye_tracking)
+                             skip_eye_tracking=self.skip_eye_tracking,
+                             verbose=self.verbose)
         self._remove_extra_failed()
 
         self._get_ophys_cells_table()
 
         self.expt_table = self._expt_table_loaded()
         self.expt_list = self.expt_table.index.tolist()
+
+    def reload_experiment(self, ophys_experiment_id):
+        """Reload experiment with new dev object"""
+        expt = load_ophys_expts([ophys_experiment_id],
+                                multi=False,
+                                dev=self.dev,
+                                skip_eye_tracking=self.skip_eye_tracking,
+                                verbose=self.verbose)
+        self.experiments[ophys_experiment_id] = expt
 
     def sample_experiment(self):
         """Just get 1st experiment from dict"""
@@ -103,11 +127,12 @@ class ExperimentGroup():
         # boolean index to filter experiment table by self.filters dict
         filter_index = pd.Series([True] * len(self.expt_table_to_load))
         for key, value in self.filters.items():
-            print(key, value)
+            if self.verbose:
+                print(key, value)
             filter_index = filter_index & local_expt_table[key].isin(
                 value).values
-
-        print(f"Found {sum(filter_index)} experiments matching filters")
+        if self.verbose:
+            print(f"Found {sum(filter_index)} experiments matching filters")
 
         self.expt_table_to_load = (self.expt_table_to_load[filter_index.values]
                                    .sort_values(by="date_of_acquisition"))
