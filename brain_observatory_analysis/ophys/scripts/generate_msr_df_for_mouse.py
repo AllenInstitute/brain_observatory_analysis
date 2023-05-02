@@ -7,9 +7,8 @@ import brain_observatory_analysis.ophys.stimulus_response as sr
 # (add mjd_dev to path)
 import sys
 sys.path.append("//home/iryna.yavorska/code/brain_observatory_analysis/brain_observatory_analysis/ophys/scripts")
-import coreg_utils as cu
-
-import stim_response_plots as stp
+# import coreg_utils as cu
+# import stim_response_plots as stp
 
 from pathlib import Path
 # args parser
