@@ -104,9 +104,7 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     corr_ordered = corr[mean_corr_sorted_ind, :][:, mean_corr_sorted_ind]
 
     # trace_df is grouped by experiemnts, so we can get the number of cells in each experiment
-    if ('cell_specimen_id' in trace_df.keys()) and (None in trace_df.cell_specimen_id.values):
-        trace_df.drop(columns=['cell_specimen_id'], inplace=True)
-    numcell_cumsum = np.cumsum([x[0] for x in trace_df.groupby(['oeid']).count().values])
+    numcell_cumsum = np.cumsum([x[0] for x in trace_df[['targeted_structure', 'depth_order', 'oeid']].groupby(['oeid']).count().values])
     xy_ticks = np.insert(numcell_cumsum, 0, 0)
     xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first().targeted_structure.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
     xy_label_pos = xy_ticks[:-1] + np.diff(xy_ticks) / 2
