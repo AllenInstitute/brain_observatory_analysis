@@ -19,7 +19,7 @@ from allensdk.brain_observatory.behavior.behavior_project_cache import \
 import brain_observatory_qc.utilities.experiment_table_utils as etu
 
 from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
-     BehaviorOphysExperimentDev
+    BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
     import BehaviorOphysExperiment
 
@@ -29,23 +29,24 @@ from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
 # loading experiment table
 ########################################################################
 
-def get_expts_by_mouseid(mouse_ids):
+def get_expts_by_mouseid(mouse_ids, passed_only=True):
 
     cache = VisualBehaviorOphysProjectCache.from_lims()
-    expts_table = cache.get_ophys_experiment_table(passed_only=False)
+    expts_table = cache.get_ophys_experiment_table(passed_only=passed_only)
     expts_table = expts_table[expts_table['mouse_id'].isin(mouse_ids)]
 
     return expts_table
 
 
-def start_lamf_analysis(verbose=False):
+def start_lamf_analysis(verbose=False, passed_only=False):
 
     projects = ["LearningmFISHTask1A",
                 "LearningmFISHDevelopment"]
 
     recent_expts = get_recent_expts(date_after="2021-08-01",
                                     projects=projects,
-                                    pkl_workaround=False)
+                                    pkl_workaround=False,
+                                    passed_only=passed_only)
 
     # TODO parallelize : see dask update
     # https://stackoverflow.com/questions/45545110/make-pandas-dataframe-apply-use-all-cores
@@ -80,7 +81,8 @@ def start_lamf_analysis(verbose=False):
 def start_gh_analysis():
     projects = ["VisualBehaviorMultiscope4areasx2d"]
     expt_table = get_expts(projects=projects,
-                           pkl_workaround=False)
+                           pkl_workaround=False,
+                           passed_only=True)
     expt_table = etu.experiment_table_extended(expt_table)
     return expt_table
 
@@ -88,7 +90,8 @@ def start_gh_analysis():
 def start_vb_analysis():
     projects = ['VisualBehaviorMultiscope', 'VisualBehavior', 'VisualBehaviorTask1B']
     expt_table = get_expts(projects=projects,
-                           pkl_workaround=False)
+                           pkl_workaround=False,
+                           passed_only=True)
     expt_table = etu.experiment_table_extended(expt_table)
     return expt_table
 
@@ -124,7 +127,7 @@ def get_expts(projects: list = [],
 
 
 def get_expt_table(pkl_workaround: bool = False,
-                   passed_only: bool = False):
+                   passed_only: bool = True):
     if pkl_workaround:
         print("Implementing pkl workaround hack will PIKA fixes LIMS/MTRAIN")
         experiments_table = expt_table_fix.get_ophys_experiment_table()
@@ -289,7 +292,7 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
 
     """
     if log:
-        #logger = logging.getLogger("get_ophys_expt")
+        # logger = logging.getLogger("get_ophys_expt")
         logging.exception(f"ophys_expt_id: {ophys_expt_id}")
 
     try:
