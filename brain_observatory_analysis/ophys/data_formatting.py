@@ -247,7 +247,6 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
     return trace_df_gray_pre_task, trace_df_gray_post_task, trace_df_fingerprint
 
 
-# A function to get non-auto-rewarded start and end times
 def get_non_auto_rewarded_start_end_times(stim_df):
     """ Get start and end times of non-auto-rewarded stimuli
 
@@ -320,7 +319,8 @@ def get_start_end_inds(start_times, stop_times, expt_group, oeids):
 
 
 def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, column_names=None):
-    """ Get trace_df for a given session
+    """ Get trace_df for a given session, while the animal was performing the task
+    It has an option to remove auto-rewarded stimuli
 
     Parameters
     ----------
@@ -394,6 +394,7 @@ def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, colum
 def get_all_annotated_stimulus_presentations(exp):
     """ Get stimulus presentations with all behavioral annotations
     Merge dataframe from data_formatting.get_annotated_stimulus_presentations and data_formatting.annotate_stimuli
+    For overlapping columns, the ones from data_formatting.annotate_stimuli will be dropped.
 
     Parameters
     ----------
@@ -413,16 +414,18 @@ def get_all_annotated_stimulus_presentations(exp):
     return stim_df
 
 
-def get_event_annotated_response_df(exp, event_type, data_type='dff', image_order=3, inter_image_interval=0.75, output_sampling_rate=20):
-    """ Get stimulus presentations with event annotations
+def get_stim_annotated_response_df(exp, stim_type, data_type='dff', image_order=3, inter_image_interval=0.75, output_sampling_rate=20):
+    """ Get response dataframe with stimulus annotations
     Merge dataframe from data_formatting.get_annotated_stimulus_presentations and data_formatting.annotate_stimuli
     to data_formatting.get_stimulus_response_df
+    Only works when cell_specimen_id is not None, due to mindscope_utilities.data_formatting working only on cell_specimen_ids.
+        - TODO: when mindscope_utilities.data_formatting is updated to work on cell_roi_ids, change the code accordingly
 
     Parameters
     ----------
     exp: BehaviorOphysExperiment
         Behavior ophys experiment object
-    event_type: str
+    stim_type: str
         Visual stimulus type, e.g. 'images', 'images>n-changes', 'changes', 'omissions', etc.
     data_type: str, optional
         Data type, e.g., 'dff' and 'events', default 'dff'
@@ -439,27 +442,29 @@ def get_event_annotated_response_df(exp, event_type, data_type='dff', image_orde
         A dataframe containing stimulus presentations with event annotations
     """
     if exp.cell_specimen_table.index.unique()[0] is not None:
-        response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, event_type=event_type, image_order=image_order,
+        response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, event_type=stim_type, image_order=image_order,
                                                                time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate)
         stim_df = get_all_annotated_stimulus_presentations(exp)
         response_df = response_df.merge(stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
         response_df['oeid'] = exp.ophys_experiment_id
-    else:
+    else:  # cell specimen id is None
         response_df = None
 
     return response_df
 
 
-def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', image_order=3,
-                       inter_image_interval=0.75, output_sampling_rate=20, remove_auto_rewarded=True, column_names=None):
-    """ Get trace dataframe for a given session and event type
+def get_stim_annotated_response_df_session(expt_group, session_name, stim_type, data_type='dff', image_order=3,
+                                           inter_image_interval=0.75, output_sampling_rate=20, remove_auto_rewarded=True, column_names=None):
+    """ Get trace dataframe for a given session and stimulus type
+    It is just a collection of get_stim_annotated_response_df for all the experiments in a session
+
     Parameters
     ----------
     expt_group: ExperimentGroup
         ExperimentGroup object
     session_name: str
         Session name
-    event_type: str
+    stim_type: str
         Visual stimulus type, e.g. 'images', 'images>n-changes', 'changes', 'omissions', etc.
     data_type: str, optional
         Data type, e.g., 'dff' and 'events', default 'dff'
@@ -491,12 +496,12 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
         csids = expt_group.experiments[oeid].cell_specimen_table.index.values
-        if event_type == 'images>n-changes':
-            response_df = get_event_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=event_type, image_order=image_order,
-                                                          inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
+        if stim_type == 'images>n-changes':
+            response_df = get_stim_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=stim_type, image_order=image_order,
+                                                         inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
         else:
-            response_df = get_event_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=event_type,
-                                                          inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
+            response_df = get_stim_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=stim_type,
+                                                         inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
         
         if len(response_df) > 0:
             if remove_auto_rewarded:
@@ -533,8 +538,9 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
     return trace_df
 
 
-def get_all_annotated_session_response_df(expt_group, session_name, inter_image_interval=0.75, output_sampling_rate=20):
+def get_all_annotated_response_df_session(expt_group, session_name, inter_image_interval=0.75, output_sampling_rate=20):
     """Get all response_df for a session from all experiments in a expt_group
+    Most useful to save the results for later use.
 
     Parameters
     ----------
@@ -549,79 +555,85 @@ def get_all_annotated_session_response_df(expt_group, session_name, inter_image_
     
     Returns
     -------
-    response_df: pandas DataFrame
+    response_df_session: pandas DataFrame
         DataFrame with stimulus presentations for all experiments in a session
     """
     
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
-    response_df = pd.DataFrame()
+    response_df_session = pd.DataFrame()
     for oeid in oeids:
         exp = expt_group.experiments[oeid]
-        temp_df = get_event_annotated_response_df(exp, event_type='all', inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
-        if temp_df is not None:
-            response_df = response_df.append(temp_df)
-    return response_df
+        response_df_exp = get_stim_annotated_response_df(exp, stim_type='all', inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
+        if response_df_exp is not None:
+            response_df_session = response_df_session.append(response_df_exp)
+    return response_df_session
 
 
-def get_trace_df_event_from_all_response_df(response_df_session, expt_group, event_type, image_order=3, inter_image_interval=0.75):
-    """Get trace DataFrame for a particular event type from all experiments in a session
-
+def get_stim_trace_df_session_from_all_response_df(response_df_session, expt_group, stim_type, image_order=3, inter_image_interval=0.75):
+    """Get trace DataFrame for a particular stim type from all experiments in a session,
+    using response_df_session from get_all_annotated_response_df_session.
+    Trace df, as opposed to response df, is all concatenated traces from all responses in each cell. (i.e., concatenated response df) 
+    Thus, stim_type cannot be 'all', as it is the same as task_trace_df.
+    Useful to study population activity pattern variations for a particular stimulus type.
+    
     Parameters
     ----------
     response_df_session: pandas DataFrame
         DataFrame with stimulus presentations for all experiments in a session
     expt_group: Experiment group object
-        Experiment group object for Learning and mFISH project
-    event_type: str
-        Event type, e.g., 'images', 'images-n-omissions', 'images-n-changes', 'images>n-changes'
+        Experiment group object, necessary for getting column names
+    stim_type: str
+        Visual stimulus type, e.g., 'images', 'images-n-omissions', 'images-n-changes', 'images>n-changes'
     image_order: int, optional
-        Image order for n in event_type, default 3
+        Image order for n in stim_type, default 3
     
     Returns
     -------
-    trace_df_event: pandas DataFrame
-        DataFrame with traces for a particular event type from all experiments in a session
+    stim_trace_df: pandas DataFrame
+        DataFrame with traces for a particular stim type from all experiments in a session
     """
 
-    if event_type == 'images-n-omissions':
+    if stim_type == 'images-n-omissions':
         condition = (response_df_session['n_after_omission']==image_order) & \
                     (response_df_session['n_after_change'] > response_df_session['n_after_omission'])  # noqa E501
-    elif event_type == 'images-n-changes':
+    elif stim_type == 'images-n-changes':
         condition = (response_df_session['n_after_change']==image_order) & \
                     ((response_df_session['n_after_omission'] > response_df_session['n_after_change']) | # noqa E501  
                         (response_df_session['n_after_omission'] == -1))  # for trials without omission
-    elif event_type == 'images>n-omissions':
+    elif stim_type == 'images>n-omissions':
         condition = (response_df_session['n_after_omission'] > image_order) & \
                     (response_df_session['n_after_change'] > response_df_session['n_after_omission'])
-    elif event_type == 'images>n-changes':
+    elif stim_type == 'images>n-changes':
         condition = (response_df_session['n_after_change'] > image_order) & \
                     ((response_df_session['n_after_omission'] > image_order) |  # noqa E501
                         (response_df_session['n_after_omission'] == -1))  # for trials without omission
-    elif event_type == 'images-n-before-changes':
+    elif stim_type == 'images-n-before-changes':
         condition = (response_df_session['n_before_change'] == image_order) & \
                     (response_df_session['n_after_omission'] == -1)  # Get trials without omission only
-    elif event_type == 'changes':
+    elif stim_type == 'changes':
         condition = (response_df_session['n_after_change'] == 0)
-    elif event_type == 'omissions':
+    elif stim_type == 'omissions':
         condition = (response_df_session['n_after_omission'] == 0)
     else:
-        raise ValueError('event_type not recognized')
+        raise ValueError('stim_type not recognized')
     conditioned_df_session = response_df_session[condition]
 
-    trace_df = get_trace_df_from_response_df_session(conditioned_df_session, expt_group, inter_image_interval=inter_image_interval)
+    stim_trace_df_session = get_stim_trace_df_from_conditioned_response_df_session(conditioned_df_session, expt_group, inter_image_interval=inter_image_interval)
           
-    return trace_df
+    return stim_trace_df_session
 
 
-def get_trace_df_from_response_df_session(response_df_session, expt_group, inter_image_interval=0.75, column_names=None):
-    """Get trace DataFrame from all experiments in a session
+def get_stim_trace_df_from_conditioned_response_df_session(conditioned_df_session, expt_group, inter_image_interval=0.75, column_names=None):
+    """Get stimulus trace DataFrame from all experiments in a session
+    Input response df has already been conditioned to a particular stim type.
+    Useful when investigating population activity variation for repeated stimulus presentations.
 
     Parameters
     ----------
-    response_df_session: pandas DataFrame
-        DataFrame with stimulus presentations for all experiments in a session
+    conditioned_df_session: pandas DataFrame
+        DataFrame with a specific stimulus presentations (conditioned) for all experiments in a session
     expt_group: Experiment group object
-        Experiment group object for Learning and mFISH project
+        Experiment group object, necessary for getting column names
     inter_image_interval: float, optional
         Inter image interval in seconds, default 0.75
     column_names: list, optional
@@ -629,8 +641,8 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
     
     Returns
     -------
-    trace_df: pandas DataFrame
-        DataFrame with traces for all experiments in a session
+    stim_trace_df_session: pandas DataFrame
+        DataFrame with traces for the stimulus for all experiments in a session
     """
     # Set the column names
     if column_names is None:
@@ -639,10 +651,10 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
     column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
   
     # Initialize the trace DataFrame
-    trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
-    oeids = np.sort(response_df_session.oeid.unique())
+    stim_trace_df_session = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
+    oeids = np.sort(conditioned_df_session.oeid.unique())
     for oeid in oeids:
-        response_df_oeid = response_df_session.query('oeid==@oeid')
+        response_df_oeid = conditioned_df_session.query('oeid==@oeid')
         csids = response_df_oeid.cell_specimen_id.unique()
         
         first_timestamps = response_df_oeid.trace_timestamps.values[0]
@@ -668,8 +680,8 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
             temp_df[cn] = expt_group.expt_table.loc[oeid][cn]
         temp_df.set_index('cell_specimen_id', inplace=True)
         temp_df.sort_index(inplace=True)
-        trace_df = pd.concat([trace_df, temp_df])
-    return trace_df
+        stim_trace_df_session = pd.concat([stim_trace_df_session, temp_df])
+    return stim_trace_df_session
 
 
 def get_concatenated_mean_response_df_from_response_df(response_df, csid_list=None):
