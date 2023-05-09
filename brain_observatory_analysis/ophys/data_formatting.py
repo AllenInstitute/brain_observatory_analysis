@@ -74,6 +74,8 @@ def get_all_trace_df(expt_group, session_name, trace_type='dff', column_names=No
         session name
     trace_type : str, optional
         'dff' or 'events', by default 'dff'
+    column_names : list, optional
+        column names of the dataframe, by default None (will use _default_column_names())
     
     Returns
     -------
