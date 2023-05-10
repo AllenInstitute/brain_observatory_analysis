@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from typing import Union
+from pathlib import Path
 
 from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
@@ -22,6 +24,10 @@ class ExperimentGroup():
         use BehaviorOphysExperimentDev object
     test_mode : bool, optional
         load only 2 experiments, by default False
+    dev_dff_path : Union[str, Path], optional
+        path to dev dff files, by default None
+    dev_events_path : Union[str, Path], optional
+        path to dev events files, by default None
 
     Attributes
     ----------
@@ -38,7 +44,9 @@ class ExperimentGroup():
                  filters: dict = {},
                  dev: bool = False,
                  skip_eye_tracking: bool = False,
-                 test_mode: bool = False):
+                 test_mode: bool = False,
+                 dev_dff_path: Union[str, Path] = None,
+                 dev_events_path: Union[str, Path] = None,):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
         self.expt_list_to_load = self.expt_table_to_load.index.tolist()
@@ -50,6 +58,16 @@ class ExperimentGroup():
         self.failed_to_load = []  # set after loading
         self.grp_ophys_cells_table = pd.DataFrame()
         self.skip_eye_tracking = skip_eye_tracking
+
+        if dev_dff_path is not None:
+            self.dev_dff_path = Path(dev_dff_path)
+        else:
+            self.dev_dff_path = None
+
+        if dev_events_path is not None:
+            self.dev_events_path = Path(dev_events_path)
+        else:
+            self.dev_events_path = None
 
         if self.filters:
             # make sure each value in filters is a list
@@ -76,9 +94,12 @@ class ExperimentGroup():
                              multi=True,
                              return_failed=False,
                              dev=self.dev,
+                             dev_dff_path=self.dev_dff_path,
+                             dev_events_path=self.dev_events_path,
                              skip_eye_tracking=self.skip_eye_tracking)
         self._remove_extra_failed()
 
+        # In case where cell_specimen_ids should be corrected later?
         self._get_ophys_cells_table()
 
         self.expt_table = self._expt_table_loaded()
