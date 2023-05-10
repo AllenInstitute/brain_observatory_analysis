@@ -414,7 +414,8 @@ def get_all_annotated_stimulus_presentations(exp):
     return stim_df
 
 
-def get_stim_annotated_response_df(exp, stim_type, data_type='dff', image_order=3, inter_image_interval=0.75, output_sampling_rate=20):
+def get_stim_annotated_response_df(exp, stim_type, data_type='dff', image_order=3, inter_image_interval=0.75,
+                                   output_sampling_rate=20, interpolate=True):
     """ Get response dataframe with stimulus annotations
     Merge dataframe from data_formatting.get_annotated_stimulus_presentations and data_formatting.annotate_stimuli
     to data_formatting.get_stimulus_response_df
@@ -439,11 +440,19 @@ def get_stim_annotated_response_df(exp, stim_type, data_type='dff', image_order=
     Returns
     -------
     response_df: pandas.DataFrame
-        A dataframe containing stimulus presentations with event annotations
+        A dataframe containing stimulus presentations with stim annotations
     """
+    # if data_type == 'dff':
+    #     interpolate = True
+    # elif data_type == 'events':
+    #     interpolate = False
+    # else:
+    #     raise ValueError('data_type must be either "dff" or "events"')
+    
     if exp.cell_specimen_table.index.unique()[0] is not None:
-        response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, event_type=stim_type, image_order=image_order,
-                                                               time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate)
+        response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, stim_type=stim_type, image_order=image_order,
+                                                               time_window=[0, inter_image_interval], output_sampling_rate=output_sampling_rate,
+                                                               interpolate=interpolate)
         stim_df = get_all_annotated_stimulus_presentations(exp)
         response_df = response_df.merge(stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
         response_df['oeid'] = exp.ophys_experiment_id
@@ -482,7 +491,7 @@ def get_stim_annotated_response_df_session(expt_group, session_name, stim_type, 
     Returns
     -------
     trace_df: pandas.DataFrame
-        A dataframe containing traces for a given session and event type
+        A dataframe containing traces for a given session and stim type
     """
 
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
@@ -497,10 +506,10 @@ def get_stim_annotated_response_df_session(expt_group, session_name, stim_type, 
     for oeid in oeids:
         csids = expt_group.experiments[oeid].cell_specimen_table.index.values
         if stim_type == 'images>n-changes':
-            response_df = get_stim_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=stim_type, image_order=image_order,
+            response_df = get_stim_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, stim_type=stim_type, image_order=image_order,
                                                          inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
         else:
-            response_df = get_stim_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=stim_type,
+            response_df = get_stim_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, stim_type=stim_type,
                                                          inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
         
         if len(response_df) > 0:
@@ -538,7 +547,7 @@ def get_stim_annotated_response_df_session(expt_group, session_name, stim_type, 
     return trace_df
 
 
-def get_all_annotated_response_df_session(expt_group, session_name, inter_image_interval=0.75, output_sampling_rate=20):
+def get_all_annotated_response_df_session(expt_group, session_name, data_type, inter_image_interval=0.75, output_sampling_rate=20):
     """Get all response_df for a session from all experiments in a expt_group
     Most useful to save the results for later use.
 
@@ -548,6 +557,8 @@ def get_all_annotated_response_df_session(expt_group, session_name, inter_image_
         Experiment group object for Learning and mFISH project
     session_name: str
         Session name
+    data_type: str
+        Data type, e.g., 'dff' and 'events'
     inter_image_interval: float, optional
         Inter image interval in seconds, default 0.75
     output_sampling_rate: float, optional
@@ -563,7 +574,7 @@ def get_all_annotated_response_df_session(expt_group, session_name, inter_image_
     response_df_session = pd.DataFrame()
     for oeid in oeids:
         exp = expt_group.experiments[oeid]
-        response_df_exp = get_stim_annotated_response_df(exp, stim_type='all', inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
+        response_df_exp = get_stim_annotated_response_df(exp, stim_type='all', data_type=data_type, inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
         if response_df_exp is not None:
             response_df_session = response_df_session.append(response_df_exp)
     return response_df_session
