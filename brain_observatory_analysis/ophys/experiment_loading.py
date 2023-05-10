@@ -19,7 +19,7 @@ from allensdk.brain_observatory.behavior.behavior_project_cache import \
 import brain_observatory_qc.utilities.experiment_table_utils as etu
 
 from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
-     BehaviorOphysExperimentDev
+    BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
     import BehaviorOphysExperiment
 
@@ -218,8 +218,15 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
         Whether to use multiprocessing
     return_failed : bool
         Whether to return failed experiments
-    dev : bool
-        Whether to use pipeline_dev.BehaviorOphysExperimentDev object
+    dev : bool, optional
+        Whether to use pipeline_dev.BehaviorOphysExperimentDev object,
+        by default False
+    dev_dff_path : Path
+        Path to dff file if dev
+    dev_events_path : Path
+        Path to events file if dev
+    skip_eye_tracking : bool, optional
+        Whether to skip eye tracking, by default False
 
     Returns
     -------
@@ -278,6 +285,10 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
         turn on logging
     dev: bool, optional
         use pipeline_dev.BehaviorOphysExperimentDev object
+    dev_dff_path: Path, optional
+        path to dev dff file, default None
+    dev_events_path: Path, optional
+        path to dev events file, default None
     kwargs : dict
         kwargs to pass to BehaviorOphysExperiment or dev object
 
@@ -289,7 +300,7 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
 
     """
     if log:
-        #logger = logging.getLogger("get_ophys_expt")
+        # logger = logging.getLogger("get_ophys_expt")
         logging.exception(f"ophys_expt_id: {ophys_expt_id}")
 
     try:
@@ -329,6 +340,16 @@ def get_ophys_expt_multi(expt_ids: list,
     ----------
     expt_ids : list
         list of ophys experiment ids
+    return_failed : bool, optional
+        whether to return failed experiments
+    dev: bool, optional
+        use pipeline_dev.BehaviorOphysExperimentDev object
+    dev_dff_path: Path, optional
+        path to dev dff file, default None
+    dev_events_path: Path, optional
+        path to dev events file, default None
+    skip_eye_tracking: bool, optional
+        whether to skip eye tracking
 
     Returns
     -------

@@ -24,6 +24,10 @@ class ExperimentGroup():
         use BehaviorOphysExperimentDev object
     test_mode : bool, optional
         load only 2 experiments, by default False
+    dev_dff_path : Union[str, Path], optional
+        path to dev dff files, by default None
+    dev_events_path : Union[str, Path], optional
+        path to dev events files, by default None
 
     Attributes
     ----------
