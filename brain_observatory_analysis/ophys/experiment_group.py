@@ -238,7 +238,7 @@ class ExperimentGroup():
             except KeyError:
                 # warn
                 print(f"WARNING: no {attr_key} for {oeid}, returning blank")
-                traces = pd.DataFrame(columns=[col_key])
+                trace = pd.DataFrame(columns=[col_key])
 
             traces.append(trace)
 
