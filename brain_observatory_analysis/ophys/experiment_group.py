@@ -204,3 +204,44 @@ class ExperimentGroup():
             for expt in self.experiments.values():
                 cell_tables.append(expt.cell_specimen_table)
         self.grp_ophys_cells_table = pd.concat(cell_tables)
+
+    def stack_traces_from_expt_grp(self, data_type="dff"):
+        """ Return all traces from each experiment stacked as numpy array
+
+        Only works if all experiments are from the same ophys_experiment_session_id
+        Parameters
+        ----------
+        data_type : str, optional
+            Type of data to return, by default "dff"
+
+        Returns
+        -------
+        np.array
+        """
+
+        assert len(self.expt_table["ophys_session_id"].unique()) == 1, \
+            "expt_table has more than one ophys_session_id, can't stack traces"
+
+        events = []
+        dfs = []
+        for oeid, expt in self.experiments.items():
+            df = expt.dff_traces.copy()
+            try:
+                event = expt.events.copy()
+            except AttributeError:
+                # if no events, make empty df
+                event = pd.DataFrame(columns=["events"])
+
+            dfs.append(df)
+            events.append(event)
+
+        dff_df = pd.concat(dfs, axis=0)
+        event_df = pd.concat(events, axis=0)
+
+        # grab each list from dff and make array
+        dff_traces = np.array(dff_df["dff"].tolist())
+        event_traces = np.array(event_df["events"].tolist())
+        if data_type == "dff":
+            return dff_traces
+        elif data_type == "events":
+            return event_traces
