@@ -209,10 +209,12 @@ class ExperimentGroup():
         """ Return all traces from each experiment stacked as numpy array
 
         Only works if all experiments are from the same ophys_experiment_session_id
+
         Parameters
         ----------
         data_type : str, optional
             Type of data to return, by default "dff"
+            Options: "dff", "events", "filtered_events"
 
         Returns
         -------
@@ -222,26 +224,27 @@ class ExperimentGroup():
         assert len(self.expt_table["ophys_session_id"].unique()) == 1, \
             "expt_table has more than one ophys_session_id, can't stack traces"
 
-        events = []
-        dfs = []
+        if data_type == "dff":
+            attr_key = f"{data_type}_traces"
+        elif data_type in ["events", "filtered_events"]:
+            attr_key = f"{data_type}"
+
+        col_key = data_type  # "dff", "events", "filtered_events"
+
+        traces = []
         for oeid, expt in self.experiments.items():
-            df = expt.dff_traces.copy()
             try:
-                event = expt.events.copy()
-            except AttributeError:
-                # if no events, make empty df
-                event = pd.DataFrame(columns=["events"])
+                trace = getattr(expt, attr_key).copy()
+            except KeyError:
+                # warn
+                print(f"WARNING: no {attr_key} for {oeid}, returning blank")
+                traces = pd.DataFrame(columns=[col_key])
 
-            dfs.append(df)
-            events.append(event)
+            traces.append(trace)
 
-        dff_df = pd.concat(dfs, axis=0)
-        event_df = pd.concat(events, axis=0)
+        df = pd.concat(traces, axis=0)
 
         # grab each list from dff and make array
-        dff_traces = np.array(dff_df["dff"].tolist())
-        event_traces = np.array(event_df["events"].tolist())
-        if data_type == "dff":
-            return dff_traces
-        elif data_type == "events":
-            return event_traces
+        traces_array = np.array(df[col_key].tolist())
+
+        return traces_array
