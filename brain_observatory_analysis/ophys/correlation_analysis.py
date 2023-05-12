@@ -32,10 +32,11 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
 
     """
     trace_array = np.vstack(trace_df.trace.values)
-    
+
     # Check if there are too many nan frames or cells with too many nan frames
     num_cell = len(trace_df)
-    num_nan_frames_threshold = int(trace_array.shape[1] * nan_frame_prop_threshold)
+    num_nan_frames_threshold = int(
+        trace_array.shape[1] * nan_frame_prop_threshold)
     nan_frames = np.where(np.isnan(trace_array).sum(axis=0) > 0)[0]
     num_nan_frames = len(nan_frames)
 
@@ -43,20 +44,24 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
     if num_nan_frames > 0:
         if num_nan_frames > num_nan_frames_threshold:
             num_nan_frames_each = np.isnan(trace_array).sum(axis=1)
-            ind_many_nan_frames = np.where(num_nan_frames_each > num_nan_frames_threshold)[0]
+            ind_many_nan_frames = np.where(
+                num_nan_frames_each > num_nan_frames_threshold)[0]
             num_nan_cells = len(ind_many_nan_frames)
             if num_nan_cells / num_cell > nan_cell_prop_threshold:
-                raise ValueError(f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
+                raise ValueError(
+                    f"Too many cells with nan frames > threshold {nan_frame_prop_threshold}: {num_nan_cells} out of {num_cell}")
             else:
-                print(f"{num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
+                print(
+                    f"{num_nan_cells} cells with nan frames proportion > threshold {nan_frame_prop_threshold}")
                 remove_ind = ind_many_nan_frames
                 valid_trace_array = np.delete(trace_array, remove_ind, axis=0)
-                nan_frames = np.where(np.isnan(valid_trace_array).sum(axis=0) > 0)[0]
+                nan_frames = np.where(
+                    np.isnan(valid_trace_array).sum(axis=0) > 0)[0]
                 num_nan_frames = len(nan_frames)
                 print(f"{num_nan_frames} frames with nan values")
         else:
             print(f"{num_nan_frames} frames with nan values")
-        
+
     return trace_array, remove_ind, nan_frames
 
 
@@ -74,7 +79,7 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
         Threshold for the proportion of nan frames in a cell, default 0.2
     nan_cell_prop_threshold: float, optional
         Threshold for the proportion of nan cells in a session, default 0.2
-    
+
     Returns
     -------
     corr: np.ndarray (2d)
@@ -92,7 +97,8 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     remove_ind: np.ndarray (1d)
         Indices of cells to be removed due to large number of nan frames
     """
-    trace_array, remove_ind, nan_frame_ind = get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold, nan_cell_prop_threshold)
+    trace_array, remove_ind, nan_frame_ind = get_trace_array_from_trace_df(
+        trace_df, nan_frame_prop_threshold, nan_cell_prop_threshold)
     assert len(remove_ind) == 0
     assert len(nan_frame_ind) == 0
 
@@ -104,9 +110,11 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     corr_ordered = corr[mean_corr_sorted_ind, :][:, mean_corr_sorted_ind]
 
     # trace_df is grouped by experiemnts, so we can get the number of cells in each experiment
-    numcell_cumsum = np.cumsum([x[0] for x in trace_df[['targeted_structure', 'depth_order', 'oeid']].groupby(['oeid']).count().values])
+    numcell_cumsum = np.cumsum([x[0] for x in trace_df[[
+                               'targeted_structure', 'depth_order', 'oeid']].groupby(['oeid']).count().values])
     xy_ticks = np.insert(numcell_cumsum, 0, 0)
-    xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first().targeted_structure.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
+    xy_labels = [f"{x}-{y}" for x, y in zip(trace_df.groupby(['oeid']).first(
+    ).targeted_structure.values, trace_df.groupby(['oeid']).first().bisect_layer.values)]
     xy_label_pos = xy_ticks[:-1] + np.diff(xy_ticks) / 2
 
     # order the corr matrix by the mean correlation of each cell within each oeid
@@ -114,10 +122,12 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
     within_region_sorted_ind = np.array(range(0, corr.shape[0]))
     for i in range(len(numcell_cumsum)):
         # find the order within each oeid
-        within_mean_corr = np.mean(corr[xy_ticks[i]: xy_ticks[i + 1], xy_ticks[i]: xy_ticks[i + 1]], axis=1)
+        within_mean_corr = np.mean(
+            corr[xy_ticks[i]: xy_ticks[i + 1], xy_ticks[i]: xy_ticks[i + 1]], axis=1)
         within_order = np.argsort(-within_mean_corr)  # descending order
         # trace_array_ordered_by_region[xy_ticks[i]:xy_ticks[i + 1], :] = trace_array[xy_ticks[i]: xy_ticks[i + 1], :][within_order, :]
-        within_region_sorted_ind[xy_ticks[i]:xy_ticks[i + 1]] = within_region_sorted_ind[xy_ticks[i]:xy_ticks[i + 1]][within_order]
+        within_region_sorted_ind[xy_ticks[i]:xy_ticks[i + 1]
+                                 ] = within_region_sorted_ind[xy_ticks[i]:xy_ticks[i + 1]][within_order]
     trace_array_ordered_by_region = trace_array[within_region_sorted_ind, :]
     corr_ordered_by_region = np.corrcoef(trace_array_ordered_by_region)
 
@@ -137,7 +147,7 @@ def _append_results(results, trace_df, epoch):
         Dataframe containing trace and other information
     epoch: str
         Epoch name
-    
+
     Returns
     -------
     results: dict
@@ -145,7 +155,8 @@ def _append_results(results, trace_df, epoch):
     """
     results['epochs'].append(epoch)
     results['trace_dfs'].append(trace_df)
-    corr, corr_ordered, corr_ordered_by_region, xy_labels, xy_label_pos, sorted_ind, remove_ind = get_correlation_matrices(trace_df)
+    corr, corr_ordered, corr_ordered_by_region, xy_labels, xy_label_pos, sorted_ind, remove_ind = get_correlation_matrices(
+        trace_df)
     results['corr_matrices'].append(corr)
     results['corr_ordered_matrices'].append(corr_ordered)
     results['corr_ordered_by_region_matrices'].append(corr_ordered_by_region)
@@ -172,7 +183,7 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
         Inter image interval, default 0.75
     output_sampling_rate: float
         Output sampling rate, default 20 (Hz)
-    
+
     Returns
     -------
     epochs: list
@@ -208,8 +219,9 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
     trace_task_df = df.get_trace_df_task(lamf_group, session_name)
     if len(trace_task_df) > 0:
         results = _append_results(results, trace_task_df, 'task')
-        
-        trace_graypre_df, trace_graypost_df, trace_fingerprint_df = df.get_trace_df_no_task(lamf_group, session_name)
+
+        trace_graypre_df, trace_graypost_df, trace_fingerprint_df = df.get_trace_df_no_task(
+            lamf_group, session_name)
         if len(trace_graypre_df) > 0:
             assert (trace_task_df.index.values - trace_graypre_df.index.values).any() == False  # noqa: E712
             results = _append_results(results, trace_graypre_df, 'graypre')
@@ -217,22 +229,23 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
         if len(trace_graypost_df) > 0:
             assert (trace_task_df.index.values - trace_graypost_df.index.values).any() == False  # noqa: E712
             results = _append_results(results, trace_graypost_df, 'graypost')
-        
+
         if len(trace_fingerprint_df) > 0:
             assert (trace_task_df.index.values - trace_fingerprint_df.index.values).any() == False  # noqa: E712
-            results = _append_results(results, trace_fingerprint_df, 'fingerprint')
-        
+            results = _append_results(
+                results, trace_fingerprint_df, 'fingerprint')
+
         events = ['images>n-changes', 'changes', 'omissions']
         for event in events:
             trace_event_df = df.get_trace_df_event(lamf_group, session_name=session_name, event_type=event,
-                                                   image_order=image_order, inter_image_interval=inter_image_interval, 
+                                                   image_order=image_order, inter_image_interval=inter_image_interval,
                                                    output_sampling_rate=output_sampling_rate)
             if len(trace_event_df) > 0:
                 assert (trace_task_df.index.values - trace_event_df.index.values).any() == False  # noqa: E712
                 if event == 'images>n-changes':
                     event = 'images'
                 results = _append_results(results, trace_event_df, event)
-        
+
     epochs, trace_dfs, corr_matrices, corr_ordered_matrices, corr_ordered_by_region_matrices, \
         xy_label_pos_list, xy_labels_list, sorted_inds_list, remove_inds_list = results.values()
 
@@ -285,7 +298,8 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
     for i in range(1, num_rows):
         remove_inds = np.union1d(remove_inds, remove_inds_list[inds[i]])
     # Only show the cell indice that are not removed in any of the compared matrices
-    ref_sort_ind = [si for si in sorted_inds_list[inds[0]] if si not in remove_inds]
+    ref_sort_ind = [si for si in sorted_inds_list[inds[0]]
+                    if si not in remove_inds]
     comp_sorted_by_ref = []
     num_indice = []
     for i in range(1, num_rows):
@@ -294,11 +308,13 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
         # However, the resulting compared matrices will all have the same number of cells
         temp_sort_ind = ref_sort_ind.copy()
         for j in range(len(temp_sort_ind)):
-            reduction = np.where(remove_inds_list[inds[i]] < temp_sort_ind[j])[0].shape[0]
+            reduction = np.where(remove_inds_list[inds[i]] < temp_sort_ind[j])[
+                0].shape[0]
             temp_sort_ind[j] -= reduction
         assert len(temp_sort_ind) == len(np.unique(temp_sort_ind))
         num_indice.append(len(temp_sort_ind))
-        comp_sorted_by_ref.append(corr_matrices[inds[i]][temp_sort_ind, :][:, temp_sort_ind])
+        comp_sorted_by_ref.append(
+            corr_matrices[inds[i]][temp_sort_ind, :][:, temp_sort_ind])
     assert len(np.unique(num_indice)) == 1
 
     fig, ax = plt.subplots(num_rows, 3, figsize=(15, num_rows * 5))
@@ -309,7 +325,7 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
     sns.heatmap(corr_ordered_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor},
                 vmin=vmin, vmax=vmax, ax=ax[0, 1])
     ax[0, 1].set_title(compare_epochs[0] + ' sorted')
-    sns.heatmap(corr_ordered_by_region_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor}, 
+    sns.heatmap(corr_ordered_by_region_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor},
                 vmin=vmin, vmax=vmax, ax=ax[0, 2])
     ax[0, 2].set_title(compare_epochs[0] + ' sorted within region')
 
@@ -344,4 +360,3 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
     fig.tight_layout()
 
     return fig
-
