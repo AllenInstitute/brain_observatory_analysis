@@ -58,6 +58,7 @@ class ExperimentGroup():
         self.failed_to_load = []  # set after loading
         self.grp_ophys_cells_table = pd.DataFrame()
         self.skip_eye_tracking = skip_eye_tracking
+        self.loaded = False
 
         if dev_dff_path is not None:
             self.dev_dff_path = Path(dev_dff_path)
@@ -104,6 +105,7 @@ class ExperimentGroup():
 
         self.expt_table = self._expt_table_loaded()
         self.expt_list = self.expt_table.index.tolist()
+        self.loaded = True
 
     def sample_experiment(self):
         """Just get 1st experiment from dict"""
@@ -205,7 +207,7 @@ class ExperimentGroup():
                 cell_tables.append(expt.cell_specimen_table)
         self.grp_ophys_cells_table = pd.concat(cell_tables)
 
-    def stack_traces_from_expt_grp(self, data_type="dff"):
+    def stack_traces_from_expt_grp(self, data_type: str = "dff", return_crid: bool = False):
         """ Return all traces from each experiment stacked as numpy array
 
         Only works if all experiments are from the same ophys_experiment_session_id
@@ -215,11 +217,17 @@ class ExperimentGroup():
         data_type : str, optional
             Type of data to return, by default "dff"
             Options: "dff", "events", "filtered_events"
+        return_crid : bool, optional
+            Return cell_roi_id index, by default False
 
         Returns
         -------
         np.array
         """
+
+        # if not loaded, load expts
+        if not self.loaded:
+            self.load_experiments()
 
         assert len(self.expt_table["ophys_session_id"].unique()) == 1, \
             "expt_table has more than one ophys_session_id, can't stack traces"
@@ -246,5 +254,9 @@ class ExperimentGroup():
 
         # grab each list from dff and make array
         traces_array = np.array(df[col_key].tolist())
+        cell_roi_ids = df.cell_roi_id.values
 
-        return traces_array
+        if return_crid:
+            return traces_array, cell_roi_ids
+        else:
+            return traces_array
