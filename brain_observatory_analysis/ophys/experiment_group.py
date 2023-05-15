@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from typing import Union
+from pathlib import Path
 
 from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
@@ -24,6 +26,10 @@ class ExperimentGroup():
         load only 2 experiments, by default False
     group_name : str, optional
         name of group, by default None. Useful for filenames
+    dev_dff_path : Union[str, Path], optional
+        path to dev dff files, by default None
+    dev_events_path : Union[str, Path], optional
+        path to dev events files, by default None
 
     Attributes
     ----------
@@ -42,7 +48,9 @@ class ExperimentGroup():
                  skip_eye_tracking: bool = False,
                  test_mode: bool = False,
                  group_name: str = None,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 dev_dff_path: Union[str, Path] = None,
+                 dev_events_path: Union[str, Path] = None):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
         self.expt_list_to_load = self.expt_table_to_load.index.tolist()
@@ -64,6 +72,17 @@ class ExperimentGroup():
                 self.group_name = mouse_names[0]
             else:
                 self.group_name = "NamelessGroup"
+        self.loaded = False
+
+        if dev_dff_path is not None:
+            self.dev_dff_path = Path(dev_dff_path)
+        else:
+            self.dev_dff_path = None
+
+        if dev_events_path is not None:
+            self.dev_events_path = Path(dev_events_path)
+        else:
+            self.dev_events_path = None
 
         if self.filters:
             # make sure each value in filters is a list
@@ -90,14 +109,17 @@ class ExperimentGroup():
                              multi=True,
                              return_failed=False,
                              dev=self.dev,
-                             skip_eye_tracking=self.skip_eye_tracking,
-                             verbose=self.verbose)
+                             dev_dff_path=self.dev_dff_path,
+                             dev_events_path=self.dev_events_path,
+                             skip_eye_tracking=self.skip_eye_tracking)
         self._remove_extra_failed()
 
+        # In case where cell_specimen_ids should be corrected later?
         self._get_ophys_cells_table()
 
         self.expt_table = self._expt_table_loaded()
         self.expt_list = self.expt_table.index.tolist()
+        self.loaded = True
 
     def reload_experiment(self, ophys_experiment_id):
         """Reload experiment with new dev object"""
@@ -208,3 +230,57 @@ class ExperimentGroup():
             for expt in self.experiments.values():
                 cell_tables.append(expt.cell_specimen_table)
         self.grp_ophys_cells_table = pd.concat(cell_tables)
+
+    def stack_traces_from_expt_grp(self, data_type: str = "dff", return_crid: bool = False):
+        """ Return all traces from each experiment stacked as numpy array
+
+        Only works if all experiments are from the same ophys_experiment_session_id
+
+        Parameters
+        ----------
+        data_type : str, optional
+            Type of data to return, by default "dff"
+            Options: "dff", "events", "filtered_events"
+        return_crid : bool, optional
+            Return cell_roi_id index, by default False
+
+        Returns
+        -------
+        np.array
+        """
+
+        # if not loaded, load expts
+        if not self.loaded:
+            self.load_experiments()
+
+        assert len(self.expt_table["ophys_session_id"].unique()) == 1, \
+            "expt_table has more than one ophys_session_id, can't stack traces"
+
+        if data_type == "dff":
+            attr_key = f"{data_type}_traces"
+        elif data_type in ["events", "filtered_events"]:
+            attr_key = f"{data_type}"
+
+        col_key = data_type  # "dff", "events", "filtered_events"
+
+        traces = []
+        for oeid, expt in self.experiments.items():
+            try:
+                trace = getattr(expt, attr_key).copy()
+            except KeyError:
+                # warn
+                print(f"WARNING: no {attr_key} for {oeid}, returning blank")
+                trace = pd.DataFrame(columns=[col_key])
+
+            traces.append(trace)
+
+        df = pd.concat(traces, axis=0)
+
+        # grab each list from dff and make array
+        traces_array = np.array(df[col_key].tolist())
+        cell_roi_ids = df.cell_roi_id.values
+
+        if return_crid:
+            return traces_array, cell_roi_ids
+        else:
+            return traces_array

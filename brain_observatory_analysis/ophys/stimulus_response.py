@@ -3,9 +3,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Union
 import json
-import datetime
 
-from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
+from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 # TODO: change to brain_observatory utilities
@@ -23,7 +22,7 @@ import multiprocessing as mp
 
 
 def _get_mean_stim_response_df(expt, event_type, data_type, load_from_file, save_to_file):
-            # TODO: MOVE TO DEV
+    # TODO: MOVE TO DEV
     try:
         expt_id = expt.ophys_experiment_id
         expt.extended_stimulus_presentations = \
@@ -38,7 +37,7 @@ def _get_mean_stim_response_df(expt, event_type, data_type, load_from_file, save
                                         data_type=data_type,
                                         load_from_file=load_from_file,
                                         save_to_file=save_to_file)
-        
+
         sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
         mdf = get_standard_mean_df(sdf)
         mdf["ophys_experiment_id"] = expt_id
@@ -48,7 +47,7 @@ def _get_mean_stim_response_df(expt, event_type, data_type, load_from_file, save
     except Exception as e:
         print(f"Failed to get stim response for: {expt_id}, {e}")
         mdf = pd.DataFrame()
-    
+
     return mdf
 
 
@@ -97,17 +96,13 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                             correlation_values
         """
 
-
-
-
-
     mdfs = []
 
     if multi:
         with mp.Pool(processes=mp.cpu_count()) as pool:
             mdfs = pool.starmap(_get_mean_stim_response_df,
                                 [(expt, event_type, data_type, load_from_file, save_to_file) for expt_id, expt in expt_group.experiments.items()])
-            
+
         mdfs = pd.concat(mdfs).reset_index(drop=True)
 
     else:

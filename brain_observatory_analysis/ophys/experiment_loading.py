@@ -5,6 +5,7 @@ import os
 import warnings
 from functools import partial
 from typing import Union
+from pathlib import Path
 import logging
 from collections import ChainMap
 import pandas as pd
@@ -15,10 +16,10 @@ import brain_observatory_analysis.utilities.file_utils as fu
 
 from allensdk.brain_observatory.behavior.behavior_project_cache import \
     VisualBehaviorOphysProjectCache
-import brain_observatory_qc.utilities.experiment_table_utils as etu
+import brain_observatory_analysis.utilities.experiment_table_utils as etu
 
-from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
-     BehaviorOphysExperimentDev
+from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import \
+    BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
     import BehaviorOphysExperiment
 
@@ -204,7 +205,9 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
                      return_failed=False,
                      dev=False,
                      skip_eye_tracking=False,
-                     verbose=True) -> dict:
+                     dev_dff_path: Path = None,
+                     dev_events_path: Path = None,
+                     ) -> dict:
     """Load expts from LIMS and return datasets, single or multi core
 
     Parameters
@@ -215,8 +218,15 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
         Whether to use multiprocessing
     return_failed : bool
         Whether to return failed experiments
-    dev : bool
-        Whether to use pipeline_dev.BehaviorOphysExperimentDev object
+    dev : bool, optional
+        Whether to use pipeline_dev.BehaviorOphysExperimentDev object,
+        by default False
+    dev_dff_path : Path
+        Path to dff file if dev
+    dev_events_path : Path
+        Path to events file if dev
+    skip_eye_tracking : bool, optional
+        Whether to skip eye tracking, by default False
 
     Returns
     -------
@@ -237,7 +247,10 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
             get_ophys_expt_multi(expts_to_analyze,
                                  return_failed=return_failed,
                                  dev=dev,
-                                 skip_eye_tracking=skip_eye_tracking)
+                                 dev_dff_path=dev_dff_path,
+                                 dev_events_path=dev_events_path,
+                                 skip_eye_tracking=skip_eye_tracking
+                                 )
     # TODO return failed for this case
     else:
         datasets_dict = {}
@@ -245,7 +258,10 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
             datasets_dict.update(get_ophys_expt(expt_id,
                                                 as_dict=True,
                                                 dev=dev,
-                                                skip_eye_tracking=skip_eye_tracking))
+                                                dev_dff_path=dev_dff_path,
+                                                dev_events_path=dev_events_path,
+                                                skip_eye_tracking=skip_eye_tracking
+                                                ))
     if return_failed:
         failed = None  # TODO: check is needed
         return data_dict, failed
@@ -254,8 +270,9 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
 
 
 def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
+                   dev=False, dev_dff_path=None, dev_events_path=None,
                    skip_eye_tracking=False,
-                   dev=False, **kwargs) -> Union[BehaviorOphysExperiment, dict]:
+                   **kwargs) -> Union[BehaviorOphysExperiment, dict]:
     """get ophys experiment from lims
 
     Parameters
@@ -268,6 +285,10 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
         turn on logging
     dev: bool, optional
         use pipeline_dev.BehaviorOphysExperimentDev object
+    dev_dff_path: Path, optional
+        path to dev dff file, default None
+    dev_events_path: Path, optional
+        path to dev events file, default None
     kwargs : dict
         kwargs to pass to BehaviorOphysExperiment or dev object
 
@@ -279,7 +300,7 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
 
     """
     if log:
-        #logger = logging.getLogger("get_ophys_expt")
+        # logger = logging.getLogger("get_ophys_expt")
         logging.exception(f"ophys_expt_id: {ophys_expt_id}")
 
     try:
@@ -290,6 +311,8 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
                                                            **kwargs)
         else:
             experiment = BehaviorOphysExperimentDev(ophys_expt_id,
+                                                    dev_dff_path=dev_dff_path,
+                                                    dev_events_path=dev_events_path,
                                                     skip_eye_tracking=skip_eye_tracking,
                                                     **kwargs)
         if as_dict:
@@ -311,6 +334,8 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
 def get_ophys_expt_multi(expt_ids: list,
                          return_failed: bool = False,
                          dev=False,
+                         dev_dff_path=None,
+                         dev_events_path=None,
                          skip_eye_tracking=False) -> dict:
     """Use multiprocessing to load list of ophys experiments
 
@@ -318,6 +343,16 @@ def get_ophys_expt_multi(expt_ids: list,
     ----------
     expt_ids : list
         list of ophys experiment ids
+    return_failed : bool, optional
+        whether to return failed experiments
+    dev: bool, optional
+        use pipeline_dev.BehaviorOphysExperimentDev object
+    dev_dff_path: Path, optional
+        path to dev dff file, default None
+    dev_events_path: Path, optional
+        path to dev events file, default None
+    skip_eye_tracking: bool, optional
+        whether to skip eye tracking
 
     Returns
     -------
@@ -330,6 +365,8 @@ def get_ophys_expt_multi(expt_ids: list,
 
     with mp.Pool(mp.cpu_count() - 2) as P:
         func = partial(get_ophys_expt, as_dict=True, dev=dev,
+                       dev_dff_path=dev_dff_path,
+                       dev_events_path=dev_events_path,
                        skip_eye_tracking=skip_eye_tracking)
         result = P.map(func, expt_ids)
 
