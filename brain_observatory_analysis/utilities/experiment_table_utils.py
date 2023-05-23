@@ -22,6 +22,11 @@ MOUSE_NAMES = {"603892": "Gold",
                "637848": "Xenon",
                "637851": "Radon"}
 
+# maps "reporter" column to "gcamp_name" column
+gcamp_name_map = {"Ai195(TIT2L-GC7s-ICF-IRES-tTA2)-hyg": 'GCaMP7s',
+                  "Ai210(TITL-GC7f-ICF-IRES-tTA2)-hyg": 'GCaMP7f',
+                  "Ai93(TITL-GCaMP6f)": 'GCaMP6f'}
+
 ########################################################################
 # Primary functions
 ########################################################################
@@ -82,6 +87,8 @@ def experiment_table_extended(df: pd.DataFrame):
         - 'n_exposure_session_type_num_layer'
         - 'reporter_line'
         - 'reporter'
+        - 'cre_name'
+        - 'date_string'
 
     """
     df = add_n_exposure_session_type_column(df)
@@ -90,8 +97,11 @@ def experiment_table_extended(df: pd.DataFrame):
     df = add_bisect_layer_column(df)
     df = add_depth_order_column(df)
     df = add_fixed_reporter_line_column(df)
-    df = add_fixed_reporter_line_column(df)
     df = add_mouse_names_columns(df)
+    df = add_cre_name_column(df)
+    df = add_date_string_column(df)
+    df = add_ai_reporter_name_column(df)
+    df = add_gcamp_name_column(df)
 
     return df
 
@@ -278,6 +288,35 @@ def add_fixed_reporter_line_column(df):
         return row.full_genotype.split(';')[-1].split('/')[0]
 
     df["reporter"] = df.apply(fix_reporter_line, axis=1)
+
+    return df
+
+
+def add_cre_name_column(df):
+
+    df['cre_line'] = df['cre_line'].fillna('')
+    df['cre_name'] = (df['cre_line'].apply(lambda x: x.split('-')[0]))
+
+    return df
+
+
+def add_date_string_column(df):
+    def date_from_dt(x):
+        return str(x).split(' ')[0]
+    df['date_string'] = (df['date_of_acquisition'].apply(lambda x: date_from_dt(x)))
+
+    return df
+
+
+def add_ai_reporter_name_column(df):
+    df["ai_reporter_name"] = df["reporter"].apply(lambda x: x.split("(")[0])
+
+    return df
+
+
+def add_gcamp_name_column(df):
+
+    df["gcamp_name"] = df["reporter"].map(gcamp_name_map)
 
     return df
 

@@ -1,5 +1,3 @@
-# %%
-# import pandas as pd
 from allensdk.internal.api import PostgresQueryMixin
 import os
 import warnings
@@ -23,56 +21,33 @@ from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import \
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
     import BehaviorOphysExperiment
 
-
-# %%
 ########################################################################
 # loading experiment table
 ########################################################################
 
-def get_expts_by_mouseid(mouse_ids):
 
-    cache = VisualBehaviorOphysProjectCache.from_lims()
-    expts_table = cache.get_ophys_experiment_table(passed_only=False)
-    expts_table = expts_table[expts_table['mouse_id'].isin(mouse_ids)]
+def start_lamf_analysis(verbose=False, include_dev_projects=False):
 
-    return expts_table
-
-
-def start_lamf_analysis(verbose=False):
-
-    projects = ["LearningmFISHTask1A",
-                "LearningmFISHDevelopment"]
+    if include_dev_projects:
+        projects = ["LearningmFISHTask1A",
+                    "LearningmFISHDevelopment"]
+    else:
+        projects = ["LearningmFISHTask1A"]
 
     recent_expts = get_recent_expts(date_after="2021-08-01",
                                     projects=projects,
                                     pkl_workaround=False)
 
-    # TODO parallelize : see dask update
-    # https://stackoverflow.com/questions/45545110/make-pandas-dataframe-apply-use-all-cores
-
-    check_params = False
-    if check_params:
-        recent_expts["new_mc_params"] = apply_func_df_row(
-            recent_expts, check_expt_mc_params)
-
-    # TODO: need to filter by project mice before this
     recent_expts = etu.experiment_table_extended(recent_expts)
 
-    # filter by lamftask1a mice
-    names = ["Gold", "Silver", "Bronze", "Copper", "Nickel",
-             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron", "Cobalt"]
-    recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
+    # # filter by lamftask1a mice
+    # names = ["Gold", "Silver", "Bronze", "Copper", "Nickel",
+    #          "Titanium", "Silicon", "Aluminum", "Mercury", "Iron", "Cobalt"]
+    # recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
 
-    recent_expts = etu.experiment_table_extended_project(recent_expts,
-                                                         project="LearningmFISHTask1A")
-    if verbose:
-        print('')
-        print(recent_expts.groupby("project_code").project_code.count())
-        print('')
-        print(recent_expts.groupby("mouse_name").mouse_name.count())
-
-    # sort by date_of_acquisition
-    recent_expts = recent_expts.sort_values(by="date_of_acquisition")
+    if not include_dev_projects:
+        recent_expts = etu.experiment_table_extended_project(recent_expts,
+                                                             project="LearningmFISHTask1A")
 
     return recent_expts
 
@@ -91,6 +66,16 @@ def start_vb_analysis():
                            pkl_workaround=False)
     expt_table = etu.experiment_table_extended(expt_table)
     return expt_table
+
+
+def get_expts_by_mouseid(mouse_ids):
+
+    cache = VisualBehaviorOphysProjectCache.from_lims()
+    expts_table = cache.get_ophys_experiment_table(passed_only=False)
+    expts_table = expts_table[expts_table['mouse_id'].isin(mouse_ids)]
+    expts_table = etu.experiment_table_extended(expts_table)
+
+    return expts_table
 
 
 def apply_func_df(df, func):
@@ -129,9 +114,15 @@ def get_expt_table(pkl_workaround: bool = False,
         print("Implementing pkl workaround hack will PIKA fixes LIMS/MTRAIN")
         experiments_table = expt_table_fix.get_ophys_experiment_table()
     else:
-        print("Should be on older version of allensdk branch, let MJD know if not")
+        print("--------------------------------------------------------\n"
+              "You have requested a direct experiment table LIMS call."
+              "\nYou should be on older version/branch of AllenSDK (like MJD's 'lamf_hacks')."
+              "\nIf you see a progress bar that is taking a long time, you are on the wrong version."
+              "\n-------------------------------------------------------")
         cache = VisualBehaviorOphysProjectCache.from_lims()
         experiments_table = cache.get_ophys_experiment_table(passed_only=passed_only)
+
+    experiments_table = experiments_table.sort_values(by=["date_of_acquisition"])
     return experiments_table
 
 
@@ -147,6 +138,14 @@ def get_recent_expts(date_after: str = '2021-01-01',
     ----------
     date_after : str
         date after which to return experiments
+    projects : list
+        list of project codes to filter by
+    pkl_workaround : bool
+        use pkl workaround to get experiments table
+    passed_only : bool
+        only return experiments that have passed QC
+    verbose : bool
+        print useful info
 
     Returns
     -------
@@ -154,34 +153,25 @@ def get_recent_expts(date_after: str = '2021-01-01',
         list of experiment (Format: Experiment_Table)
     """
     experiments_table = get_expt_table(pkl_workaround=pkl_workaround, passed_only=passed_only)
-    # deep copy helped warning
-    recent_experiments = experiments_table.loc[experiments_table.date_of_acquisition > date_after].copy(
-    )
+    recent_expts = experiments_table.copy()
+    recent_expts = recent_expts.loc[recent_expts.date_of_acquisition > date_after]
 
     if projects:
-        recent_experiments = recent_experiments.query(
-            "project_code in @projects").copy()
+        recent_expts = recent_expts[recent_expts.project_code.isin(projects)]
 
-    recent_experiments.sort_values("date_of_acquisition", inplace=True)
+    recent_expts.sort_values("date_of_acquisition", inplace=True)
+    recent_expts = etu.experiment_table_extended(recent_expts)
 
-    # fix dates
-    # recent_experiments['dates_str'] = recent_experiments.date_of_acquisition.astype(str)
-    def date_from_dt(x):
-        return str(x).split(' ')[0]
-    recent_experiments['date_string'] = (recent_experiments['date_of_acquisition']
-                                         .apply(lambda x: date_from_dt(x)))
-    # pretty other cols
-    recent_experiments['cre'] = (recent_experiments['cre_line']
-                                 .apply(lambda x: x.split('-')[0]))
     # print useful info
     if verbose:
         print("Table Info \n----------")
+        print(f"N Experiments: {recent_expts.shape[0]}")
+        print(f"QC states: {recent_expts.experiment_workflow_state.unique()}")
+        print(f"Projects: {recent_expts.project_code.unique()}")
+        print(f"Cre lines: {recent_expts.cre_line.unique()}")
+        print(f"Mouse IDs: {recent_expts.mouse_id.unique()}")
 
-        print(f"Experiments: {recent_experiments.shape[0]}")
-        print(recent_experiments.experiment_workflow_state.unique())
-        print(recent_experiments.project_code.unique())
-
-    return recent_experiments
+    return recent_expts
 
 
 def display_expt_table(df, extra_cols=[]):
@@ -194,6 +184,18 @@ def display_expt_table(df, extra_cols=[]):
     return df[["mouse_id", "mouse_name", "project_code", "date_string", "cre",
                "imaging_depth", "targeted_structure", "session_type",
                "equipment_name"] + extra_cols]
+
+
+def check_mc_params(expt_table):
+    """Look at mc paramters (sigma for time and space) and see if they have been updated.
+
+    ~mid 2022, mc parameters were updated to fix residual motion artifacts in rigid translation.
+    This fixed the offending params, which were changed for SSF project.
+
+    """
+    expt_table["new_mc_params"] = apply_func_df_row(expt_table, check_expt_mc_params)
+    return expt_table
+
 
 ########################################################################
 # loading experiments
@@ -243,30 +245,28 @@ def load_ophys_expts(expts_to_analyze: Union[list, pd.DataFrame],
     # TODO: implement check that all ids are valid
 
     if multi:
-        data_dict = \
+        datasets_dict = \
             get_ophys_expt_multi(expts_to_analyze,
                                  return_failed=return_failed,
                                  dev=dev,
                                  dev_dff_path=dev_dff_path,
                                  dev_events_path=dev_events_path,
-                                 skip_eye_tracking=skip_eye_tracking
-                                 )
-    # TODO return failed for this case
+                                 skip_eye_tracking=skip_eye_tracking)
     else:
         datasets_dict = {}
         for expt_id in expts_to_analyze:
-            datasets_dict.update(get_ophys_expt(expt_id,
-                                                as_dict=True,
-                                                dev=dev,
-                                                dev_dff_path=dev_dff_path,
-                                                dev_events_path=dev_events_path,
-                                                skip_eye_tracking=skip_eye_tracking
-                                                ))
+            new_item = get_ophys_expt(expt_id,
+                                      as_dict=True,
+                                      dev=dev,
+                                      dev_dff_path=dev_dff_path,
+                                      dev_events_path=dev_events_path,
+                                      skip_eye_tracking=skip_eye_tracking)
+            datasets_dict.update(new_item)
     if return_failed:
-        failed = None  # TODO: check is needed
-        return data_dict, failed
+        failed = None  # TODO: check if needed
+        return datasets_dict, failed
     else:
-        return data_dict
+        return datasets_dict
 
 
 def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
@@ -320,8 +320,6 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
         else:
             return experiment
     except Exception as e:
-        # log the exception
-        print(e)
         logging.exception(f"Failed to load ophys_expt_id: {ophys_expt_id}")
         # logger.exception(f"Failed to load expt: {ophys_expt_id}")
         # print(f"Failed to load expt: {ophys_expt_id}")

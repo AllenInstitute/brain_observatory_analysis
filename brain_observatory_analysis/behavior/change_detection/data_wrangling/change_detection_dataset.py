@@ -5,7 +5,7 @@ from . import pkl_translator
 from . import annotate
 from . import extended_trials_dataframe as ext_trials_df
 
-import mindscope_qc.data_access.from_lims as from_lims
+import brain_observatory_qc.data_access.from_lims as from_lims
 
 
 class ChangeDetectionDataset(object):

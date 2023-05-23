@@ -45,6 +45,7 @@ class ExperimentGroup():
                  expt_table_to_load: pd.DataFrame = None,
                  filters: dict = {},
                  dev: bool = False,
+                 multi_process: bool = True,
                  skip_eye_tracking: bool = False,
                  test_mode: bool = False,
                  group_name: str = None,
@@ -52,6 +53,7 @@ class ExperimentGroup():
                  dev_dff_path: Union[str, Path] = None,
                  dev_events_path: Union[str, Path] = None):
         self.dev = dev
+        self.multi_process = multi_process
         self.expt_table_to_load = expt_table_to_load
         self.expt_list_to_load = self.expt_table_to_load.index.tolist()
         self.filters = filters
@@ -67,7 +69,11 @@ class ExperimentGroup():
 
         # single mouse is a sensible group name
         if group_name is None:
-            mouse_names = self.expt_table_to_load["mouse_name"].unique()
+            # if mouse name in col
+            if "mouse_name" in self.expt_table_to_load.columns:
+                mouse_names = self.expt_table_to_load["mouse_name"].unique()
+            else:
+                mouse_names = self.expt_table_to_load["mouse_id"].unique()
             if len(mouse_names) == 1:
                 self.group_name = mouse_names[0]
             else:
@@ -106,16 +112,16 @@ class ExperimentGroup():
 
         self.experiments = \
             load_ophys_expts(expt_list,
-                             multi=True,
+                             multi=self.multi_process,
                              return_failed=False,
                              dev=self.dev,
                              dev_dff_path=self.dev_dff_path,
                              dev_events_path=self.dev_events_path,
                              skip_eye_tracking=self.skip_eye_tracking)
-        self._remove_extra_failed()
+        # self._remove_extra_failed()
 
-        # In case where cell_specimen_ids should be corrected later?
-        self._get_ophys_cells_table()
+        # # In case where cell_specimen_ids should be corrected later?
+        # self._get_ophys_cells_table()
 
         self.expt_table = self._expt_table_loaded()
         self.expt_list = self.expt_table.index.tolist()
