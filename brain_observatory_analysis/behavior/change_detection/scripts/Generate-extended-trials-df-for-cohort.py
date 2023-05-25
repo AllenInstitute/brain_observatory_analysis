@@ -1,23 +1,23 @@
-
-import click
+# standard
 import pathlib as Path
-import pandas as pd
-import mindscope_qc.projects.lamf_associative_pilot as constants
+from tqdm import tqdm
 import multiprocessing as mp
-import mindscope_qc.data_formatting.change_detection.change_detection_dataset \
+import logging
+
+# 3rd party
+import pandas as pd
+
+# brain observatory
+import brain_observatory_analysis.behavior.change_detection.data_wrangling.change_detection_dataset \
     as ChangeDetectionDataset
-from tdqm import tqdm
+import brain_observatory_analysis.projects.lamf_associative_pilot as constants
 
-# create arg input with click
-@click.command()
-@click.option('--mouse_ids', default=None, help='mouse ids to run')
-
-LEARNING_PATH = Path('/allen/programs/mindscope/workgroups/learning/')
+LEARNING_PATH = Path('//allen/programs/mindscope/workgroups/learning/')
 PROCESSED_TRIALS_DF = 'extended_trials_df.pkl'
 
-import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
 
 def cohort_extended_trials_df(mouse_ids):
     expt_table = load_expt_table_by_mice(mouse_ids)
@@ -25,7 +25,6 @@ def cohort_extended_trials_df(mouse_ids):
 
     df_cohort = bu.mp_extended_trials(expts_to_analyze)
     df_cohort = bu.add_consecutive_session_codes(df_cohort)
-
 
     return
 
@@ -41,7 +40,8 @@ def load_cohorts(cohort_dict, save_dir: str = None):
     if save_dir:
         dfs.to_pickle(save_dir / PROCESSED_TRIALS_DF)
 
-    return 
+    return
+
 
 def multi_session_extended_trials(sessions):
     """
@@ -66,8 +66,9 @@ def multi_session_extended_trials(sessions):
                          .drop(columns={'level_0'}))
         except:
             print(f"Error processing session: {session}")
-            
+
     return all_dfs
+
 
 def get_extended_trials(session):
 
@@ -128,6 +129,8 @@ def load_expt_table_by_mice(mouse_ids):
 
 # make main function to run all of the above functions
 def main():
+
+    # makea args
 
     mouse_ids_dict = constants.mouse_ids()
 

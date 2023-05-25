@@ -30,7 +30,7 @@ def get_session_licks_from_change(ext_trials_df: pd.DataFrame, lick_type: str = 
         np.ndarray
         lick times for a session
     """
-    lick_key  = parse_lick_type(lick_type)
+    lick_key = parse_lick_type(lick_type)
 
     # check that lick_key is in the dataframe
     if lick_key not in ext_trials_df.columns:
@@ -40,8 +40,6 @@ def get_session_licks_from_change(ext_trials_df: pd.DataFrame, lick_type: str = 
     if len(ext_trials_df['behavior_session_uuid'].unique()) > 1:
         print("Warning: more than 1 unique ['behavior_session_uuid'] in dataframe")
 
-
-
     licks = []
 
     for _, row in ext_trials_df.iterrows():
@@ -50,7 +48,7 @@ def get_session_licks_from_change(ext_trials_df: pd.DataFrame, lick_type: str = 
 
         # the last trial is buggy, and has very long duration,so we'll just ignore it
         if np.any(lt > 60):
-        # if np.any(lt > row['endtime'] - row['change_time']):
+            # if np.any(lt > row['endtime'] - row['change_time']):
 
             # print(row['endtime'], row['change_time'])
             # print("Warning: licks past trial end")
