@@ -47,28 +47,33 @@ if __name__ == "__main__":
     event_type = args.event_type
     data_type = args.data_type
 
-    expt_table = start_lamf_analysis(verbose=False)
+    expt_table = get_recent_expts(date_after="2021-08-01", 
+                                  projects=["LearningmFISHDevelopment", "LearningmFISHTask1A"],
+                                  pkl_workaround=False)
 
-    filters = {"mouse_name": "Copper", "targeted_structure": "VISp"}
+    mouse_name = "Dubnium"
+    filters = {"mouse_name": mouse_name}
     expt_group = ExperimentGroup(expt_table_to_load=expt_table,
-                                 filters=filters, dev=True, group_name="copper")
+                                 filters=filters, dev=True, group_name=mouse_name)
     expt_group.load_experiments()
     # cu.add_missing_csid_expt_grp(expt_group)
     fill_csid_with_rows(expt_group)
 
     msrdf_path = Path("//allen/programs/mindscope/workgroups/learning/analysis_data_cache/msrdf")
-    data_types = ['events', 'dff', 'filtered_events']
-    event_types = ["omissions", "changes"]
+    # data_types = ['events', 'dff', 'filtered_events']
+    # event_types = ["omissions", "changes"]
+    data_types = ['dff']
+    event_types = ["omissions", "changes", "images"]
 
     for data_type in data_types:
        for event_type in event_types:
             msr_df = sr.get_mean_stimulus_response_expt_group(expt_group,
-                                                                    event_type=event_type,
-                                                                    data_type=data_type,
-                                                                    load_from_file=False,
-                                                                    save_to_file=False,
-                                                                    multi=True,
-                                                                    save_expt_group_msrdf = msrdf_path)
+                                                              event_type=event_type,
+                                                              data_type=data_type,
+                                                              load_from_file=False,
+                                                              save_to_file=True,
+                                                              multi=True,
+                                                              save_expt_group_msrdf = msrdf_path)
 
 
 

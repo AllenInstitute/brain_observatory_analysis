@@ -302,7 +302,7 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
     if log:
         # logger = logging.getLogger("get_ophys_expt")
         logging.exception(f"ophys_expt_id: {ophys_expt_id}")
-
+    experiment = None
     try:
         print(f"Loading expt: {ophys_expt_id}\n")
         if not dev:
@@ -315,18 +315,17 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
                                                     dev_events_path=dev_events_path,
                                                     skip_eye_tracking=skip_eye_tracking,
                                                     **kwargs)
-        if as_dict:
-            return {ophys_expt_id: experiment}
-        else:
-            return experiment
     except Exception as e:
-        logging.exception(f"Failed to load ophys_expt_id: {ophys_expt_id}")
+        #logging.exception(f"Failed to load ophys_expt_id: {ophys_expt_id}")
         # logger.exception(f"Failed to load expt: {ophys_expt_id}")
-        # print(f"Failed to load expt: {ophys_expt_id}")
-        if as_dict:
-            return {ophys_expt_id: None}
-        else:
-            return None
+        print(f"Failed to load expt: {ophys_expt_id}")
+        print("exc1")
+        raise e 
+
+    if as_dict:
+        return {ophys_expt_id: None}
+    else:
+        return None
 
 
 def get_ophys_expt_multi(expt_ids: list,

@@ -2,6 +2,7 @@ import argparse
 import time
 from simple_slurm import Slurm
 from pathlib import Path
+import pandas as pd
 
 from brain_observatory_analysis.ophys.experiment_loading import start_lamf_analysis, get_recent_expts
 
@@ -11,11 +12,10 @@ parser = argparse.ArgumentParser(description='running sbatch for new_dff_for_oei
 parser.add_argument('--env-path', type=str, default='//data/learning/mattd/miniconda3/envs/dev', metavar='path to conda environment to use')
 parser.add_argument('--dry_run', action='store_true', default=False, help='dry run')
 parser.add_argument('--test_run', action='store_true', default=False, help='test one parameter set')
+parser.add_argument('--event_type', type=str, default='changes', metavar="event type to use for dff: omissions, images, changes")
+parser.add_argument('--data_type', type=str, default='dff', metavar="data type to use for dff: dff, events, filtered_events")
 
-parser.add_argument('--event_type', type=str, default='changes', metavar="event type to use for dff: omissions, images, changes", required=True)
-parser.add_argument('--data_type', type=str, default='dff', metavar="data type to use for dff: dff, events, filtered_events", required=True)
-
-ROOT_DIR = Path("/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df")
+ROOT_DIR = Path("/allen/programs/mindscope/workgroups/learning/analysis_data_cache/msr_df")
 
 
 def load_ai210_lamf_expts():
@@ -48,15 +48,29 @@ def add_dox_mice_and_columns(expt_table):
 
 
 def load_lamf_sample():
-    expt_table = get_recent_expts(date_after="2021-08-01",
-                                  projects=["LearningmFISHTask1A"], 
-                                  pkl_workaround=False)
-    
+    expt_table = start_lamf_analysis(verbose=False)
+
+    # filter by gcamp_name = GCaMP7s
     expt_table = expt_table[expt_table["gcamp_name"] == "GCaMP7s"]
-    expt_table = expt_table.sample(100)
+
+    # short session type =['Familiar Images + omissions', 'Novel Images + omissions', 'Novel Images EXTINCTION']
+    expt_table = expt_table[expt_table["short_session_type"].isin(['Familiar Images + omissions', 'Novel Images + omissions', 'Novel Images EXTINCTION'])]
+    expt_table = expt_table.sample(100, random_state=42)
 
     return expt_table
-    
+
+
+def load_dox_expts():
+    expt_table = get_recent_expts(date_after="2021-08-01", 
+                                  projects=["LearningmFISHDevelopment", "LearningmFISHTask1A"],
+                                  pkl_workaround=False)
+
+    expt_table = add_dox_mice_and_columns(expt_table)
+
+    lamf_210_dox = expt_table[(expt_table["gcamp_name"] == "GCaMP7f") & (expt_table["dox"])]
+    lamf_195_dox = expt_table[(expt_table["gcamp_name"] == "GCaMP7s") & (expt_table["dox"])]
+
+    return lamf_210_dox, lamf_195_dox
 
 
 if __name__ == '__main__':
@@ -68,18 +82,24 @@ if __name__ == '__main__':
     python_executable = f"{args.env_path}/bin/python"
 
     # py file
-    python_file = Path('//home/matt.davis/code/brain_observatory_analysis/brain_observatory_analysis/ophys/scripts/gen_stim_response_df.py')
+    python_file = Path('//home/matt.davis/code/brain_observatory_analysis/brain_observatory_analysis/ophys/scripts/msr_df.py')
 
     # job directory
     job_dir = ROOT_DIR
     stdout_location = job_dir / 'job_records'
     stdout_location.mkdir(parents=True, exist_ok=True)
 
+    # expt_table = start_lamf_analysis(verbose=False)
 
-    #expt_table = start_lamf_analysis(verbose=False)
+    #e1 = load_ai210_lamf_expts()
+    #e2 = load_lamf_sample()
+    e3, e4 = load_dox_expts()
+    expt_table = pd.concat([e3, e4])
 
-    expt_table = load_ai210_lamf_expts()
     expt_ids = expt_table.index.values
+
+    # check if file already in root dir, if so remove from expt_ids
+    expt_ids = [x for x in expt_ids if not (ROOT_DIR / f'{x}_images_dff.h5').exists()]
 
     # oeids
     for event_type in ["images"]:
@@ -111,8 +131,8 @@ if __name__ == '__main__':
                 print(f'starting cluster job for {oeid}, job count = {job_count}')
 
                 job_title = f'{oeid}_gen_stim_response_df'
-                walltime = '00:15:00'
-                mem = '2G'
+                walltime = '00:45:00'
+                mem = '80G'
                 # tmp = '3G',
                 job_id = Slurm.JOB_ARRAY_ID
                 job_array_id = Slurm.JOB_ARRAY_MASTER_ID

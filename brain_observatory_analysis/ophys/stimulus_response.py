@@ -8,7 +8,8 @@ from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import Behav
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 # TODO: change to brain_observatory utilities
-from mindscope_utilities.visual_behavior_ophys.data_formatting import get_stimulus_response_df
+#from mindscope_utilities.visual_behavior_ophys.data_formatting import get_stimulus_response_df
+from brain_observatory_utilities.datasets.optical_physiology.data_formatting import get_stimulus_response_df
 
 from .experiment_group import ExperimentGroup
 
@@ -21,34 +22,7 @@ import pickle
 import multiprocessing as mp
 
 
-def _get_mean_stim_response_df(expt, event_type, data_type, load_from_file, save_to_file):
-    # TODO: MOVE TO DEV
-    try:
-        expt_id = expt.ophys_experiment_id
-        expt.extended_stimulus_presentations = \
-            get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
-                                                expt.licks,
-                                                expt.rewards,
-                                                expt.running_speed,
-                                                expt.eye_tracking)
 
-        sdf = _get_stimulus_response_df(expt,
-                                        event_type=event_type,
-                                        data_type=data_type,
-                                        load_from_file=load_from_file,
-                                        save_to_file=save_to_file)
-
-        sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
-        mdf = get_standard_mean_df(sdf)
-        mdf["ophys_experiment_id"] = expt_id
-        mdf["event_type"] = event_type
-        mdf["data_type"] = data_type
-
-    except Exception as e:
-        print(f"Failed to get stim response for: {expt_id}, {e}")
-        mdf = pd.DataFrame()
-
-    return mdf
 
 
 def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
@@ -96,70 +70,73 @@ def get_mean_stimulus_response_expt_group(expt_group: ExperimentGroup,
                             correlation_values
         """
 
-    mdfs = []
-
     if multi:
         with mp.Pool(processes=mp.cpu_count()) as pool:
-            mdfs = pool.starmap(_get_mean_stim_response_df,
-                                [(expt, event_type, data_type, load_from_file, save_to_file) for expt_id, expt in expt_group.experiments.items()])
+            msr_dfs = pool.starmap(_get_mean_stim_response_df, [
+                (expt, event_type, data_type, load_from_file, save_to_file)
+                for _, expt in expt_group.experiments.items()
+            ])
 
-        mdfs = pd.concat(mdfs).reset_index(drop=True)
+        msr_dfs = pd.concat(msr_dfs).reset_index(drop=True)
 
     else:
+        msr_dfs = []
         for expt_id, expt in expt_group.experiments.items():
-            try:    
+            msr_df = _get_mean_stim_response_df(expt, event_type, data_type, load_from_file, save_to_file)
+            msr_dfs.append(msr_df)
 
-                # TODO: MOVE TO DEV
-                expt.extended_stimulus_presentations = \
-                    get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
-                                                        expt.licks,
-                                                        expt.rewards,
-                                                        expt.running_speed,
-                                                        expt.eye_tracking)
-
-                sdf = _get_stimulus_response_df(expt,
-                                                event_type=event_type,
-                                                data_type=data_type,
-                                                load_from_file=load_from_file,
-                                                save_to_file=save_to_file)
-                
-                sdf = sdf.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
-                mdf = get_standard_mean_df(sdf)
-                mdf["ophys_experiment_id"] = expt_id
-                mdf["event_type"] = event_type
-                mdf["data_type"] = data_type
-                mdfs.append(mdf)
-            except Exception as e:
-                print(f"Failed to get stim response for: {expt_id}, {e}")
-                continue
-    
-        mdfs = pd.concat(mdfs).reset_index(drop=True)
+        msr_dfs = pd.concat(msr_dfs).reset_index(drop=True)
 
     # cells_filtered has expt_table info that is useful
     expt_table = expt_group.expt_table
     oct = expt_group.grp_ophys_cells_table.reset_index()
 
-    # calculate more metrics, will likely move to own functions
-    mdfs["mean_baseline_diff"] = mdfs["mean_response"] - \
-        mdfs["mean_baseline"]
-    mdfs["mean_baseline_diff_trace"] = mdfs["mean_trace"] - \
-        mdfs["mean_baseline"]
-
-    merged_mdfs = (mdfs.merge(expt_table, on=["ophys_experiment_id"])
-                       .merge(oct, on=["cell_roi_id"]))
+    merged = (msr_dfs.merge(expt_table, on=["ophys_experiment_id"])
+              .merge(oct, on=["cell_roi_id"]))
 
     if save_expt_group_msrdf is not None:
         filename = f"{expt_group.group_name}_msrdf_{event_type}_{data_type}.pkl"
-
-        out_path = Path(save_expt_group_msrdf / filename)
-
-        # check if file exists, dont overwrite
+        out_path = Path(save_expt_group_msrdf) / filename
         if out_path.exists():
-            raise FileExistsError(f"File already exists: {out_path}")
-        merged_mdfs.to_pickle(out_path)
+            raise FileExistsError(f"{out_path}")
+        merged.to_pickle(out_path)
         print(f"SAVED: mean stimulus response dataframe to: {out_path}")
 
-    return merged_mdfs
+    return merged
+
+
+def _get_mean_stim_response_df(expt: Union[BehaviorOphysExperiment, BehaviorOphysExperimentDev],
+                               event_type: str = "changes",
+                               data_type: str = "dff",
+                               load_from_file: bool = False,
+                               save_to_file: bool = False):
+
+    try:
+        expt_id = expt.ophys_experiment_id
+        expt.extended_stimulus_presentations = \
+            get_extended_stimulus_presentations(expt.stimulus_presentations.copy(),
+                                                expt.licks,
+                                                expt.rewards,
+                                                expt.running_speed,
+                                                expt.eye_tracking)
+
+        sr_df = _get_stimulus_response_df(expt,
+                                        event_type=event_type,
+                                        data_type=data_type,
+                                        load_from_file=load_from_file,
+                                        save_to_file=save_to_file)
+
+        sr_df = sr_df.merge(expt.extended_stimulus_presentations, on='stimulus_presentations_id')
+        msr_df = get_standard_mean_df(sr_df)
+        msr_df["ophys_experiment_id"] = expt_id
+        msr_df["event_type"] = event_type
+        msr_df["data_type"] = data_type
+
+    except Exception as e:
+        print(f"FAILED: mean stim response df for: {expt_id}, \n {e}")
+        msr_df = pd.DataFrame()
+
+    return msr_df
 
 
 def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, BehaviorOphysExperimentDev],
@@ -169,7 +146,7 @@ def _get_stimulus_response_df(experiment: Union[BehaviorOphysExperiment, Behavio
                               save_to_file: bool = False,
                               load_from_file: bool = False,
                               # # "/allen/programs/mindscope/workgroups/learning/qc_plots/dev/mattd/3_lamf_mice/stim_response_cache"
-                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df_nrsac"):
+                              cache_dir: Union[str, Path] = "/allen/programs/mindscope/workgroups/learning/analysis_data_cache/stim_response_df"):
     """Helper function for get_stimulus_response_df
 
     Parameters
@@ -291,7 +268,7 @@ def get_standard_mean_df(sr_df):
         response_window_duration = sr_df.response_window_duration.values[0]
 
     output_sampling_rate = sr_df.ophys_frame_rate.unique()[0]
-    conditions = ["cell_roi_id"]
+    conditions = ["cell_specimen_id"]
 
     if get_pref_stim:
         # options for groupby "change_image_name", "image_name", "prior_image_name"
@@ -312,7 +289,7 @@ def get_standard_mean_df(sr_df):
 
 # TODO: clean + document
 def get_mean_df(stim_response_df: pd.DataFrame,
-                conditions=['cell_roi_id', 'image_name'],
+                conditions=['cell_specimen_id', 'image_name'],
                 frame_rate=11.0,
                 window_around_timepoint_seconds: list = [-3, 3],
                 response_window_duration_seconds: float = 0.5,
@@ -333,9 +310,11 @@ def get_mean_df(stim_response_df: pd.DataFrame,
     rdf = stim_response_df.copy()
     mdf = rdf.groupby(conditions).apply(get_mean_sem_trace)
     mdf = mdf[['mean_response', 'sem_response', 'mean_trace', 'sem_trace',
-               'trace_timestamps', 'mean_responses', 'mean_baseline', 'sem_baseline']]
+               'trace_timestamps', 'mean_baseline', 'mean_responses',
+               'sem_baseline', 'mean_baseline_diff', 'mean_baseline_diff_trace']]
     mdf = mdf.reset_index()
-    # save response window duration as a column for reference
+
+    # input param save
     mdf['response_window_duration'] = response_window_duration
 
     if get_pref_stim:
@@ -351,6 +330,9 @@ def get_mean_df(stim_response_df: pd.DataFrame,
             mdf, window, response_window_duration, frame_rate)
         mdf = annotate_mean_df_with_sd_over_baseline(
             mdf, window, response_window_duration, frame_rate)
+
+        # MJD: drop mean_responses column to save space, only needed for fano
+        mdf = mdf.drop(columns=['mean_responses'])
     except Exception as e:  # NOQA E722
         print(e)
         pass
@@ -366,8 +348,9 @@ def get_mean_df(stim_response_df: pd.DataFrame,
             compute_reliability, window, response_window_duration, frame_rate)
         reliability = reliability.reset_index()
         mdf['reliability'] = reliability.reliability
-        mdf['correlation_values'] = reliability.correlation_values
-        # print('done computing reliability')
+
+        # MJD: drop correlation_values column, gave 58k+ values per cell?
+        #mdf['correlation_values'] = reliability.correlation_values
     except Exception as e:
         print('failed to compute reliability')
         print(e)
@@ -462,8 +445,13 @@ def get_mean_sem_trace(group):
     sem_trace = np.std(group['trace'].values) / \
         np.sqrt(len(group['trace'].values))
     trace_timestamps = np.mean(group['trace_timestamps'], axis=0)
+
+    mean_baseline_diff = mean_response - mean_baseline
+    mean_baseline_diff_trace = mean_trace - mean_baseline
+
     return pd.Series({'mean_response': mean_response, 'sem_response': sem_response,
                       'mean_baseline': mean_baseline, 'sem_baseline': sem_baseline,
+                      'mean_baseline_diff': mean_baseline_diff, 'mean_baseline_diff_trace': mean_baseline_diff_trace,
                       'mean_trace': mean_trace, 'sem_trace': sem_trace,
                       'trace_timestamps': trace_timestamps,
                       'mean_responses': mean_responses})
@@ -548,20 +536,26 @@ def compute_reliability_vectorized(traces):
     return reliability, correlation_values
 
 
-# TODO: clean + document
-def compute_reliability(group, window=[-3, 3], response_window_duration=0.5, frame_rate=30.):
-    # computes trial to trial correlation across input traces in group,
-    # only for portion of the trace after the change time or flash onset time
+def compute_reliability(group: pd.DataFrame,
+                        window: list = [-3, 3],
+                        response_window_duration: float = 0.5,
+                        frame_rate: float = 30.):
+    """Compute reliability of response across trials in group.
+    
+    Detailes, computes trial to trial correlation across input traces in group,
+    only for portion of the trace after the change time or flash onset time.
 
+    Refactor note: VBA code
+
+
+    """
     onset = int(np.abs(window[0]) * frame_rate)
     response_window = [onset, onset + (int(response_window_duration * frame_rate))]
     traces = group['trace'].values
     traces = np.vstack(traces)
     if traces.shape[0] > 5:
-        # limit to response window
-        traces = traces[:, response_window[0]:response_window[1]]
-        reliability, correlation_values = compute_reliability_vectorized(
-            traces)
+        traces = traces[:, response_window[0]:response_window[1]]  # only response window
+        reliability, correlation_values = compute_reliability_vectorized(traces)
     else:
         reliability = np.nan
         correlation_values = []
@@ -569,7 +563,7 @@ def compute_reliability(group, window=[-3, 3], response_window_duration=0.5, fra
 
 
 ####################################################################################################
-# Annotate various data frames
+# Annotate mean_df/mean_stimulus_response_df/msr_df
 ####################################################################################################
 
 
@@ -602,8 +596,22 @@ def annotate_mean_df_with_time_to_peak(mean_df, window=[-4, 8], frame_rate=30.):
     return mean_df
 
 
-# TODO: clean + document
 def annotate_mean_df_with_fano_factor(mean_df):
+    """ Annotate mean_df/mean_stim_response_df with fano_factor
+
+    Fano factor is a measure of a nuerons response variability.
+
+    Refactor note: VBA code
+
+    Parameters
+    ----------
+    mean_df : pandas.DataFrame
+
+    Returns
+    -------
+    mean_df : pandas.DataFrame
+        DataFrame with fano_factor column
+    """
     ff_list = []
     for idx in mean_df.index:
         mean_responses = mean_df.iloc[idx].mean_responses
@@ -616,10 +624,29 @@ def annotate_mean_df_with_fano_factor(mean_df):
     return mean_df
 
 
-# TODO: clean + document
-def annotate_mean_df_with_p_value(mean_df, window=[-4, 8], response_window_duration=0.5, frame_rate=30.):
-    response_window = [np.abs(window[0]), np.abs(
-        window[0]) + response_window_duration]
+def annotate_mean_df_with_p_value(mean_df: pd.DataFrame,
+                                  window: list = [-4, 8],
+                                  response_window_duration: float = 0.5,
+                                  frame_rate: float = 30.):
+    """ Annotate mean_df with p_value for each mean_trace in mean_df
+
+    Parameters
+    ----------
+    mean_df : pandas.DataFrame
+        DataFrame with mean_trace column
+    window : list
+        List of two floats, start and end of window to use for baseline and response
+    response_window_duration : float
+        Duration of response window
+    frame_rate : float
+        Frame rate of imaging
+
+    Returns
+    -------
+    mean_df : pandas.DataFrame
+        Input DataFrame with p_value column added
+    """
+    response_window = [np.abs(window[0]), np.abs(window[0]) + response_window_duration]
     p_val_list = []
     for idx in mean_df.index:
         mean_trace = mean_df.iloc[idx].mean_trace
@@ -630,9 +657,11 @@ def annotate_mean_df_with_p_value(mean_df, window=[-4, 8], response_window_durat
 
 
 # TODO: clean + document
-def annotate_mean_df_with_sd_over_baseline(mean_df, window=[-4, 8], response_window_duration=0.5, frame_rate=30.):
-    response_window = [np.abs(window[0]), np.abs(
-        window[0]) + response_window_duration]
+def annotate_mean_df_with_sd_over_baseline(mean_df, 
+                                           window=[-4, 8], 
+                                           response_window_duration=0.5, 
+                                           frame_rate=30.):
+    response_window = [np.abs(window[0]), np.abs(window[0]) + response_window_duration]
     baseline_window = [
         np.abs(window[0]) - response_window_duration, (np.abs(window[0]))]
     sd_list = []
