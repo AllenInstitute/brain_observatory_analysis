@@ -34,6 +34,11 @@ VB_EVENTS_PATH = Path(
 CELLXGENE_PATH = Path(
     "//allen/programs/mindscope/workgroups/learning/analysis_data_cache/cellXgene/dev")
 
+# suppress FutureWarning and UserWarning
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)  # pandas.Int64Index
+warnings.simplefilter(action='ignore', category=UserWarning)  # Date of aqcuisition 
+
 
 class BehaviorOphysExperimentDev:
     """Wrapper class for BehaviorOphysExperiment that adds custom
@@ -94,18 +99,19 @@ class BehaviorOphysExperimentDev:
         # self.cell_x_gene = self._get_cell_x_gene() # TODO: implement
         self.is_roi_filtered = False
         self.filtered_events_params = filtered_events_params
-        self.dff_path = Path(dev_dff_path)
-        self.events_path = Path(dev_events_path)
+        #self.dff_path = Path(dev_dff_path)
+        #self.events_path = Path(dev_events_path)
 
-        self.dff_traces = self._get_new_dff()
+        if calc_new_dff_if_not_exist:
+            self.dff_traces = self._get_new_dff()
 
-        try:
-            self.events = self._get_new_events()
-        except FileNotFoundError:
-            # warn new_events not loaded
-            # TODO: should we create one?
-            print(f"No new_events file for ophys_experiment_id: "
-                  f"{self.ophys_experiment_id}")
+            try:
+                self.events = self._get_new_events()
+            except FileNotFoundError:
+                # warn new_events not loaded
+                # TODO: should we create one?
+                print(f"No new_events file for ophys_experiment_id: "
+                    f"{self.ophys_experiment_id}")
 
     def _get_new_dff(self):
         """Get new dff traces from pipeline_dev folder"""
