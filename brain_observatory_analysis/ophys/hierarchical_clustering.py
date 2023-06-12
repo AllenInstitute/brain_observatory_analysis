@@ -13,7 +13,7 @@ from brain_observatory_analysis.utilities import data_utils as du
 
 def get_task_df_list(base_dir, mouse_id, project_code=None):
     """Get task dataframes from a mouse.
-    
+
     Parameters
     ----------
     base_dir : str or Path
@@ -244,20 +244,20 @@ def plot_cluster_distribution(trace_df, keep_ind, cluster, region_depth_list_tem
         Mouse ID.
     session_type : str
         Session type.
-    
+
     Returns
     -------
     fig : matplotlib.figure.Figure
         Figure of the distribution of clusters in each region and depth.
     """
-    
+
     region_depth = trace_df.apply(lambda x: f'{x.targeted_structure}_{int(x.depth_order):02d}', axis=1)
     region_depth = region_depth.iloc[keep_ind]
     fig, ax = plt.subplots(1, 1, figsize=(6, 4))
     if len(region_depth.unique()) > 2:
         rd_ind = [region_depth_list_template.index(rd) for rd in region_depth.unique()]
         region_depth_list = np.sort(region_depth.unique())[np.argsort(rd_ind)]
-        
+
         for ci in range(0, len(np.unique(cluster))):
             cluster_ind = np.where(cluster == ci)[0]
             cluster_region_depth = region_depth.iloc[cluster_ind]
@@ -481,7 +481,7 @@ def get_clustered_trace_with_behavior(cluster, leaves, trace_array_std_nonan, tr
                                       cre_line, mouse_id, session_type,
                                       num_clusters=10, vmin=-2, vmax=3, sub_title_fontsize=10):
     """Get the figure of the clustered traces with behavior.
-    
+
     Parameters
     ----------
     cluster : np.ndarray
@@ -647,7 +647,7 @@ def calculate_correlation_between_cluster_and_behavior(trace_array_std_nonan, nu
     corr_mean_lick: np.ndarray
         correlation between grand mean trace and lick rate
     """
-    
+
     sliding_window = int(sliding_window_minute * 60 * imaging_freq)  # in frames (about 5 min)
     interval = int(interval_min * 60 * imaging_freq)  # in frames (about 30 sec)
     mean_trace = np.mean(trace_array_std_nonan, axis=0)
@@ -680,7 +680,7 @@ def calculate_correlation_between_cluster_and_behavior(trace_array_std_nonan, nu
         if pupil_interp is not None:
             corr_mean_pupil[ti] = np.corrcoef(mean_trace[start_ind:end_ind], pupil_interp[start_ind:end_ind])[0, 1]
         corr_mean_lick[ti] = np.corrcoef(mean_trace[start_ind:end_ind], lickrate_interp[start_ind:end_ind])[0, 1]
-    
+
     corr_timepoints = trace_timepoints[sliding_window // 2:-sliding_window // 2 - interval:interval]
     return corr_timepoints, corr_with_running, corr_with_pupil, corr_with_lick, \
         corr_running_pupil, corr_running_lick, corr_pupil_lick, \
@@ -786,7 +786,7 @@ def plot_pca_with_corr(pca_coord, pca_axes, corr_with_behav, ax, colorbar_label)
     colorbar_label: str
         label for colorbar
     """
-    im = ax.scatter(pca_coord[:, pca_axes[0]], pca_coord[:, pca_axes[1]], c=corr_with_behav, cmap='coolwarm', 
+    im = ax.scatter(pca_coord[:, pca_axes[0]], pca_coord[:, pca_axes[1]], c=corr_with_behav, cmap='coolwarm',
                     vmin=np.nanmin(corr_with_behav), vmax=np.nanmax(corr_with_behav))
     ax.set_xlabel(f'PC{pca_axes[0]+1}')
     ax.set_ylabel(f'PC{pca_axes[1]+1}')
@@ -911,13 +911,13 @@ def plot_pca_loading_corr_with_behavior(pca, running_interp, pupil_interp, lickr
     corr_pc_vs_running = np.zeros(num_pc)
     corr_pc_vs_pupil = np.zeros(num_pc)
     corr_pc_vs_lickrate = np.zeros(num_pc)
-    
+
     for i in range(num_pc):
         corr_pc_vs_running[i] = np.corrcoef(pca.components_[i, :], running_interp)[0, 1]
         if pupil_interp is not None:
             corr_pc_vs_pupil[i] = np.corrcoef(pca.components_[i, :], pupil_interp)[0, 1]
         corr_pc_vs_lickrate[i] = np.corrcoef(pca.components_[i, :], lickrate_interp)[0, 1]
-        
+
     fig, ax = plt.subplots(1, 2, figsize=(15, 5))
     ax[0].plot(range(1, 11), corr_pc_vs_running, label='running')
     ax[0].plot(range(1, 11), corr_pc_vs_pupil, label='pupil')

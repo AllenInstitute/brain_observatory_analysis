@@ -32,7 +32,7 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
 
     """
     trace_array = np.vstack(trace_df.trace.values)
-    
+
     # Check if there are too many nan frames or cells with too many nan frames
     num_cell = len(trace_df)
     num_nan_frames_threshold = int(trace_array.shape[1] * nan_frame_prop_threshold)
@@ -56,7 +56,7 @@ def get_trace_array_from_trace_df(trace_df, nan_frame_prop_threshold=0.2, nan_ce
                 print(f"{num_nan_frames} frames with nan values")
         else:
             print(f"{num_nan_frames} frames with nan values")
-        
+
     return trace_array, remove_ind, nan_frames
 
 
@@ -74,13 +74,13 @@ def get_correlation_matrices(trace_df, nan_frame_prop_threshold=0.2, nan_cell_pr
         Threshold for the proportion of nan frames in a cell, default 0.2
     nan_cell_prop_threshold: float, optional
         Threshold for the proportion of nan cells in a session, default 0.2
-    
+
     Returns
     -------
     corr: np.ndarray (2d)
         Correlation matrix (No sorting, i.e., sorted by oeid and cell specimen id)
     corr_ordered: np.ndarray (2d)
-        Correlation matrix (Sorted by mean correlation coefficient)    
+        Correlation matrix (Sorted by mean correlation coefficient)
     corr_ordered_by_region: np.ndarray (2d)
         Correlation matrix (Sorted by region and depth)
     xy_labels: list
@@ -137,7 +137,7 @@ def _append_results(results, trace_df, epoch):
         Dataframe containing trace and other information
     epoch: str
         Epoch name
-    
+
     Returns
     -------
     results: dict
@@ -172,7 +172,7 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
         Inter image interval, default 0.75
     output_sampling_rate: float
         Output sampling rate, default 20 (Hz)
-    
+
     Returns
     -------
     epochs: list
@@ -208,7 +208,7 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
     trace_task_df = df.get_trace_df_task(lamf_group, session_name)
     if len(trace_task_df) > 0:
         results = _append_results(results, trace_task_df, 'task')
-        
+
         trace_graypre_df, trace_graypost_df, trace_fingerprint_df = df.get_trace_df_no_task(lamf_group, session_name)
         if len(trace_graypre_df) > 0:
             assert (trace_task_df.index.values - trace_graypre_df.index.values).any() == False  # noqa: E712
@@ -217,22 +217,22 @@ def get_all_epoch_trace_df_and_correlation_matrices(lamf_group, session_name, im
         if len(trace_graypost_df) > 0:
             assert (trace_task_df.index.values - trace_graypost_df.index.values).any() == False  # noqa: E712
             results = _append_results(results, trace_graypost_df, 'graypost')
-        
+
         if len(trace_fingerprint_df) > 0:
             assert (trace_task_df.index.values - trace_fingerprint_df.index.values).any() == False  # noqa: E712
             results = _append_results(results, trace_fingerprint_df, 'fingerprint')
-        
+
         events = ['images>n-changes', 'changes', 'omissions']
         for event in events:
             trace_event_df = df.get_trace_df_event(lamf_group, session_name=session_name, event_type=event,
-                                                   image_order=image_order, inter_image_interval=inter_image_interval, 
+                                                   image_order=image_order, inter_image_interval=inter_image_interval,
                                                    output_sampling_rate=output_sampling_rate)
             if len(trace_event_df) > 0:
                 assert (trace_task_df.index.values - trace_event_df.index.values).any() == False  # noqa: E712
                 if event == 'images>n-changes':
                     event = 'images'
                 results = _append_results(results, trace_event_df, event)
-        
+
     epochs, trace_dfs, corr_matrices, corr_ordered_matrices, corr_ordered_by_region_matrices, \
         xy_label_pos_list, xy_labels_list, sorted_inds_list, remove_inds_list = results.values()
 
@@ -309,7 +309,7 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
     sns.heatmap(corr_ordered_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor},
                 vmin=vmin, vmax=vmax, ax=ax[0, 1])
     ax[0, 1].set_title(compare_epochs[0] + ' sorted')
-    sns.heatmap(corr_ordered_by_region_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor}, 
+    sns.heatmap(corr_ordered_by_region_matrices[inds[0]], cmap='RdBu_r', square=True, cbar_kws={'shrink': cb_shrink_factor},
                 vmin=vmin, vmax=vmax, ax=ax[0, 2])
     ax[0, 2].set_title(compare_epochs[0] + ' sorted within region')
 
@@ -344,4 +344,3 @@ def compare_correlation_matrices(compare_epochs, epochs, corr_matrices, corr_ord
     fig.tight_layout()
 
     return fig
-

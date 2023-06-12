@@ -51,7 +51,7 @@ def _get_interpolated_running(exp, timepoints):
     -------
     running_interp : array
         Interpolated running speed
-        
+
     """
     running_timestamps = exp.running_speed.timestamps.values
     running_speed = exp.running_speed.speed.values
@@ -106,7 +106,7 @@ def _get_interpolated_lickrate(exp, timepoints, lick_template_rate=100, lick_rat
     lickrate_interp : array
         Interpolated lick rate
     """
-    lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate, 
+    lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate,
                                    1 / lick_template_rate)  # timestamps are in seconds
     licks = np.zeros(len(lick_time_template))
     licktimes = exp.licks.timestamps.values
@@ -173,7 +173,7 @@ def plot_task_raster_with_behav_sort_by_corr(
         task_traces_all = task_trace_df.trace.values
         task_traces_all_zscore = np.array([(trace - np.nanmean(trace)) / np.nanmean(trace) for trace in task_traces_all])
         task_trace_all_mean = np.nanmean(task_traces_all_zscore, axis=0)
-        
+
         # Plot z-scored traces
         ax.imshow(task_traces_all_zscore[sort_ind_task, :], aspect='auto', cmap='RdBu_r', vmin=vmin, vmax=vmax)
         ax.set_ylabel('Cell # (sorted by global correlation)')
@@ -324,7 +324,7 @@ def plot_notask_raster_with_behav_sort_by_corr(
             traces_all = trace_df.trace.values
             traces_all_zscore = np.array([(trace - np.nanmean(trace)) / np.nanmean(trace) for trace in traces_all])
             trace_all_mean = np.nanmean(traces_all_zscore, axis=0)
-            
+
             # Plot z-scored traces
             if 'gray' in epoch:
                 vmin = vmin_gray
@@ -392,7 +392,7 @@ def plot_notask_raster_with_behav_sort_by_corr(
             # lax.set_title('Licks', loc='left', fontsize=sub_title_fontsize, color='pink')
 
             # Add lick rates by interpolating to the timepoints
-            lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate, 
+            lick_time_template = np.arange(0, timepoints[-1] + 1 / lick_template_rate,
                                            1 / lick_template_rate)  # timestamps are in seconds
             licks = np.zeros(len(lick_time_template))
             licktimes = exp.licks.timestamps.values
@@ -495,7 +495,7 @@ def get_traces_from_task_trace_df(exp_group, session_name, task_trace_df):
 
 def plot_trace_with_time(task_trace_df, timepoint_interval=300, cmap='viridis', vmin=-0.5, vmax=1.2):
     """Plot traces with time
-    
+
     Parameters
     ----------
     task_trace_df : pandas.DataFrame

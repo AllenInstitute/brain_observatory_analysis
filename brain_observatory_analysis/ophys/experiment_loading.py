@@ -295,7 +295,7 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
     Returns
     -------
     dict
-        single ophys experiment in dict 
+        single ophys experiment in dict
         (key: ophys_expt_id, value: BehaviorOphysExperiment)
 
     """
@@ -447,7 +447,7 @@ def check_expt_mc_params(expt_id, param_string="\"smooth_sigma_time\": 0.0",
             # check if string present or not
             if param_string.encode() in content:
                 new_params = True
-                break 
+                break
             else:
                 new_params = False
         """

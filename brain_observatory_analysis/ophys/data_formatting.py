@@ -74,12 +74,12 @@ def get_all_trace_df(expt_group, session_name, trace_type='dff', column_names=No
         session name
     trace_type : str, optional
         'dff' or 'events', by default 'dff'
-    
+
     Returns
     -------
     trace_df : pd.DataFrame
         dataframe of all traces from a session
-    
+
     """
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     if column_names is None:
@@ -129,7 +129,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
         'dff' or 'events', by default 'dff'
     column_names : list, optional
         column names of the dataframe, by default None
-    
+
     Returns
     -------
     trace_df_gray_pre_task : pd.DataFrame
@@ -142,17 +142,17 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
     gray_period = 5 * 60  # 5 minutes
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     stim_df = data_formatting.annotate_stimuli(expt_group.experiments[oeids[0]])  # First experiment represents the session stimulus presentations
-    
+
     # Match the # of indices from each experiment
     start_inds = []
     end_inds = []
     post_gray_end_inds = []
     for oeid in oeids:
         timestamps = expt_group.experiments[oeid].ophys_timestamps
-        
+
         first_stim_start_time = stim_df.start_time.values[0]
         if first_stim_start_time > gray_period - 30:  # 30 is an arbitrary buffer
-            # This buffer is to select the cases where there really was a gray screen before the task 
+            # This buffer is to select the cases where there really was a gray screen before the task
             # (same as in the other buffers below)
             # Updated allensdk has the table for these epochs, but currently we cannot use it due to loading time (2023/03/11; instead, we are using Matt's lamf_hacks branch)
             # TODO: use the table from allensdk when it is available
@@ -178,7 +178,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
                 run_fingerprint = False
         else:
             run_post_gray = False
-        
+
     if run_pre_gray:
         min_start_ind = np.min(start_inds)
     if run_post_gray:
@@ -190,7 +190,7 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
         column_names = _default_column_names()
     column_base_names = _default_column_base_names()
     column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
-    
+
     # Initialize
     trace_df_gray_pre_task = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     trace_df_gray_post_task = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
@@ -206,12 +206,12 @@ def get_notask_trace_df(expt_group, session_name, trace_type='dff', column_names
             raise ValueError('trace_type must be dff or events')
         csid = trace_df.index.values
         crid = trace_df.cell_roi_id.values
-        
+
         timestamps = expt_group.experiments[oeid].ophys_timestamps
         # cell_specimen_id, oeid, targeted_structure, depth_order, bisect_layer are the same
         # across epochs in no-task window
         # Only switch trace and timepoints for each epoch
-        
+
         temp_df['cell_specimen_id'] = csid
         temp_df['cell_roi_id'] = crid
         temp_df['oeid'] = oeid
@@ -253,7 +253,7 @@ def get_non_auto_rewarded_start_end_times(stim_df):
     ----------
     stim_df: pandas.DataFrame
         A dataframe containing stimulus information
-    
+
     Returns
     -------
     start_times: list
@@ -293,7 +293,7 @@ def get_start_end_inds(start_times, stop_times, expt_group, oeids):
         ExperimentGroup object
     oeids: list
         A list of ophys_experiment_ids
-    
+
     Returns
     -------
     max_start_inds: list
@@ -308,7 +308,7 @@ def get_start_end_inds(start_times, stop_times, expt_group, oeids):
     for start_time, end_time in zip(start_times, stop_times):
         start_inds = []
         end_inds = []
-        for oeid in oeids:    
+        for oeid in oeids:
             timestamps = expt_group.experiments[oeid].ophys_timestamps
             start_inds.append(np.where(timestamps >= start_time)[0][0])
             end_inds.append(np.where(timestamps <= end_time)[0][-1])
@@ -336,7 +336,7 @@ def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, colum
     trace_df: pandas.DataFrame
         A dataframe containing trace information during the whole task
     """
-    
+
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     stim_df = data_formatting.annotate_stimuli(expt_group.experiments[oeids[0]])  # First experiment represents the session stimulus presentations
     # Only works on old allensdk version (or lamf_hacks branch of MJD's fork)
@@ -354,7 +354,7 @@ def get_task_trace_df(expt_group, session_name, remove_auto_rewarded=True, colum
         column_names = _default_column_names()
     column_base_names = _default_column_base_names()
     column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
-  
+
     # Initialize the dataframe
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
@@ -471,7 +471,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
         Remove auto rewarded trials, default True
     column_names: list, optional
         Column names, default None
-    
+
     Returns
     -------
     trace_df: pandas.DataFrame
@@ -484,7 +484,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
         column_names = _default_column_names()
     column_base_names = _default_column_base_names()
     column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
-  
+
     # load all the traces from this session
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     for oeid in oeids:
@@ -495,14 +495,14 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
         else:
             response_df = get_event_annotated_response_df(expt_group.experiments[oeid], data_type=data_type, event_type=event_type,
                                                           inter_image_interval=inter_image_interval, output_sampling_rate=output_sampling_rate)
-        
+
         if len(response_df) > 0:
             if remove_auto_rewarded:
                 response_df = response_df[response_df.auto_rewarded == False]  # noqa: E712
 
             first_timestamps = response_df.trace_timestamps.values[0]
             assert response_df.trace_timestamps.apply(lambda x: np.all(x == first_timestamps)).all()
-            start_index = np.where(first_timestamps >= 0)[0][0]  
+            start_index = np.where(first_timestamps >= 0)[0][0]
             end_index = np.where(first_timestamps <= inter_image_interval)[0][-1]  # The last index is going to be not included
 
             csids = response_df.cell_specimen_id.unique()
@@ -516,7 +516,7 @@ def get_trace_df_event(expt_group, session_name, event_type, data_type='dff', im
             assert np.diff([len(trace) for trace in trace_all]).any() == False  # noqa: E712
             timepoints = np.concatenate([st + tts[1:] for st, tts in zip(csid_df.start_time.values, csid_df.trace_timestamps.values)])
             assert len(timepoints) == len(trace_all[0])
-            
+
             temp_df = pd.DataFrame(columns=column_names)
             temp_df['cell_specimen_id'] = csids
             temp_df['cell_roi_id'] = crids
@@ -544,13 +544,13 @@ def get_all_annotated_session_response_df(expt_group, session_name, inter_image_
         Inter image interval in seconds, default 0.75
     output_sampling_rate: float, optional
         Output sampling rate in Hz, default 20
-    
+
     Returns
     -------
     response_df: pandas DataFrame
         DataFrame with stimulus presentations for all experiments in a session
     """
-    
+
     oeids = np.sort(expt_group.expt_table[expt_group.expt_table.session_name.str.lower() == session_name.lower()].index.values)
     response_df = pd.DataFrame()
     for oeid in oeids:
@@ -574,7 +574,7 @@ def get_trace_df_event_from_all_response_df(response_df_session, expt_group, eve
         Event type, e.g., 'images', 'images-n-omissions', 'images-n-changes', 'images>n-changes'
     image_order: int, optional
         Image order for n in event_type, default 3
-    
+
     Returns
     -------
     trace_df_event: pandas DataFrame
@@ -607,7 +607,7 @@ def get_trace_df_event_from_all_response_df(response_df_session, expt_group, eve
     conditioned_df_session = response_df_session[condition]
 
     trace_df = get_trace_df_from_response_df_session(conditioned_df_session, expt_group, inter_image_interval=inter_image_interval)
-          
+
     return trace_df
 
 
@@ -624,7 +624,7 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
         Inter image interval in seconds, default 0.75
     column_names: list, optional
         List of column names to add to the trace DataFrame, default None
-    
+
     Returns
     -------
     trace_df: pandas DataFrame
@@ -635,14 +635,14 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
         column_names = _default_column_names()
     column_base_names = _default_column_base_names()
     column_names, column_added_names = _set_column_names(expt_group, column_names, column_base_names)
-  
+
     # Initialize the trace DataFrame
     trace_df = pd.DataFrame(columns=column_names).set_index('cell_specimen_id')
     oeids = np.sort(response_df_session.oeid.unique())
     for oeid in oeids:
         response_df_oeid = response_df_session.query('oeid==@oeid')
         csids = response_df_oeid.cell_specimen_id.unique()
-        
+
         first_timestamps = response_df_oeid.trace_timestamps.values[0]
         assert response_df_oeid.trace_timestamps.apply(lambda x: np.all(x == first_timestamps)).all()
         start_index = np.where(first_timestamps >= 0)[0][0]
@@ -655,9 +655,9 @@ def get_trace_df_from_response_df_session(response_df_session, expt_group, inter
             crids.append(csid_df.cell_roi_id.values[0])
             csid_trace = np.concatenate(csid_df.trace.apply(lambda x: x[start_index:end_index]).values)
             trace_all.append(csid_trace)
-        
+
         temp_df = pd.DataFrame(columns=column_names)
-        
+
         temp_df['cell_specimen_id'] = csids
         temp_df['cell_roi_id'] = crids
         temp_df['trace'] = trace_all
@@ -737,7 +737,7 @@ def get_concatenated_mean_response_df_from_response_df(response_df, csid_list=No
                                     'trace_norm': list(concat_mean_trace_norm),
                                     'trace_std_norm': list(concat_std_trace_norm),
                                     'time_stamps': [concat_timeseries] * len(cell_specimen_ids)})
-    
+
     concat_trace_df = concat_trace_df.set_index('cell_specimen_id')
     if csid_list is not None:
         concat_trace_df = concat_trace_df.loc[csid_list]
