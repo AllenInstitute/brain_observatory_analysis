@@ -7,7 +7,7 @@ def get_interpolated_time_series(timestamps, values, new_timepoints):
     """Interpolate time series to new timepoints.
     Remove timestamps with nan values and pad with first and last values
     when new_timepoints are outside the range of timestamps.
-    
+
     Parameters
     ----------
     timestamps : np.ndarray
