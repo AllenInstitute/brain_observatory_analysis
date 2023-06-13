@@ -126,6 +126,7 @@ def get_motion_correction_crop_xy_range(oeid):
 
     return range_y, range_x
 
+
 def save_figure(fig, figsize, save_dir, folder, fig_title, formats=['.png', '.pdf']):
     fig_dir = os.path.join(save_dir, folder)
     if not os.path.exists(fig_dir):

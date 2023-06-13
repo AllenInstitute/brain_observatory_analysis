@@ -1,3 +1,4 @@
+from typing import Optional, Union
 import os
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -7,11 +8,10 @@ from pathlib import Path
 VALID_EXTENSIONS = ['.png', '.pdf', '.svg', '.eps', '.ps', '.raw', '.rgba', '.jpg', '.jpeg', '.tif', '.tiff']
 RASTER_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.raw', '.rgba']
 VECTOR_EXTENSIONS = ['.pdf', '.svg', '.eps', '.ps']
-from typing import Optional, Union
 
 
 class PlotSaver:
-    def __init__(self, 
+    def __init__(self,
                  folder: Union[str, Path] = '',
                  filename: str = 'figure.png',
                  sub_folder: Optional[str] = None,
