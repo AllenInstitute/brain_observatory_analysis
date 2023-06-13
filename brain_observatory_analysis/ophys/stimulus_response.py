@@ -7,7 +7,7 @@ from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import Behav
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 # TODO: change to brain_observatory utilities
-from mindscope_utilities.visual_behavior_ophys.data_formatting import get_stimulus_response_df
+from brain_observatory_utilities.datasets.optical_physiology.data_formatting import get_stimulus_response_df
 
 from .experiment_group import ExperimentGroup
 
