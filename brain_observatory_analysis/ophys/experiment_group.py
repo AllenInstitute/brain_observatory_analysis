@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .experiment_loading import start_lamf_analysis, load_ophys_expts
 
-# from mindscope_qc.data_access.behavior_ophys_experiment_dev import \
+# from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import \
 #     BehaviorOphysExperimentDev
 # from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
 #     import BehaviorOphysExperiment
@@ -49,7 +49,6 @@ class ExperimentGroup():
                  dev_events_path: Union[str, Path] = None,):
         self.dev = dev
         self.expt_table_to_load = expt_table_to_load
-        self.expt_list_to_load = self.expt_table_to_load.index.tolist()
         self.filters = filters
         self.test_mode = test_mode
         self.expt_list = []  # set after loading
@@ -79,6 +78,8 @@ class ExperimentGroup():
         if self.expt_table_to_load is None:
             self.expt_table_to_load = start_lamf_analysis()
             # TODO: change default or allow options
+        
+        self.expt_list_to_load = self.expt_table_to_load.index.tolist()
 
     def load_experiments(self):
         if self.test_mode:
@@ -107,6 +108,15 @@ class ExperimentGroup():
         self.expt_list = self.expt_table.index.tolist()
         self.loaded = True
 
+    def reload_experiment(self, ophys_experiment_id):
+        """Reload experiment with new dev object"""
+        expt = load_ophys_expts([ophys_experiment_id],
+                                multi=False,
+                                dev=self.dev,
+                                skip_eye_tracking=self.skip_eye_tracking,
+                                verbose=self.verbose)
+        self.experiments[ophys_experiment_id] = expt
+
     def sample_experiment(self):
         """Just get 1st experiment from dict"""
         return list(self.experiments.values())[0]
@@ -125,11 +135,12 @@ class ExperimentGroup():
         # boolean index to filter experiment table by self.filters dict
         filter_index = pd.Series([True] * len(self.expt_table_to_load))
         for key, value in self.filters.items():
-            print(key, value)
+            if self.verbose:
+                print(key, value)
             filter_index = filter_index & local_expt_table[key].isin(
                 value).values
-
-        print(f"Found {sum(filter_index)} experiments matching filters")
+        if self.verbose:
+            print(f"Found {sum(filter_index)} experiments matching filters")
 
         self.expt_table_to_load = (self.expt_table_to_load[filter_index.values]
                                    .sort_values(by="date_of_acquisition"))

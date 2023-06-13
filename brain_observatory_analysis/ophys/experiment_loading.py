@@ -59,8 +59,8 @@ def start_lamf_analysis(verbose=False):
     recent_expts = etu.experiment_table_extended(recent_expts)
 
     # filter by lamftask1a mice
-    names = ["Gold", "Silver", "Bronze", "Copper", "Nickle",
-             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron"]
+    names = ["Gold", "Silver", "Bronze", "Copper", "Nickel",
+             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron", "Cobalt"]
     recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
 
     recent_expts = etu.experiment_table_extended_project(recent_expts,
@@ -322,10 +322,13 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
     except Exception as e:
         # log the exception
         print(e)
-        logging.exception(f"ophys_expt_id: {ophys_expt_id}")
+        logging.exception(f"Failed to load ophys_expt_id: {ophys_expt_id}")
         # logger.exception(f"Failed to load expt: {ophys_expt_id}")
         # print(f"Failed to load expt: {ophys_expt_id}")
-        return {ophys_expt_id: None}
+        if as_dict:
+            return {ophys_expt_id: None}
+        else:
+            return None
 
 
 def get_ophys_expt_multi(expt_ids: list,
