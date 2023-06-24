@@ -90,32 +90,44 @@ def get_stim_annotated_response_df(exp, data_type, stim_type, cache_dir=None, lo
     response_df: pandas.DataFrame
         A dataframe containing stimulus presentations with stim annotations
     """
+    if output_sampling_rate is None:
+        interpolate = False
+        cache_fn = f'{exp.ophys_experiment_id}_{data_type}_{stim_type}_nointerp.pkl'
+    else:
+        interpolate=True
+        cache_fn = f'{exp.ophys_experiment_id}_{data_type}_{stim_type}_{output_sampling_rate}Hz.pkl'
+
     if exp.cell_specimen_table.index.unique()[0] is not None:
         if cache_dir is not None:
             cache_dir = Path(cache_dir)
-
-            if output_sampling_rate is None:
-                cache_fn = f'{exp.ophys_experiment_id}_{data_type}_{stim_type}_nointerp.pkl'
-            else:
-                cache_fn = f'{exp.ophys_experiment_id}_{data_type}_{stim_type}_{output_sampling_rate}Hz.pkl'
             cache_path = cache_dir / cache_fn
             if load_from_cache and cache_path.exists():
                 print(f'Loading from cache: {cache_path}')
                 response_df = pd.read_pickle(cache_path)
             else:
-                response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, stim_type=stim_type, image_order=image_order,
-                                                                       time_window=time_window, output_sampling_rate=output_sampling_rate)
-                stim_df = get_all_annotated_stimulus_presentations(exp)
-                response_df = response_df.merge(
-                    stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
-                response_df['oeid'] = exp.ophys_experiment_id
+                response_df = _get_response_df_with_annotations(exp, data_type=data_type, stim_type=stim_type, image_order=image_order,
+                                                                time_window=time_window, output_sampling_rate=output_sampling_rate, interpolate=interpolate)
                 if save_to_cache:
                     print(f'Saving to cache: {cache_path}')
                     cache_dir.mkdir(parents=True, exist_ok=True)
                     response_df.to_pickle(cache_path)
+        else:
+            response_df = _get_response_df_with_annotations(exp, data_type=data_type, stim_type=stim_type, image_order=image_order,
+                                                            time_window=time_window, output_sampling_rate=output_sampling_rate, interpolate=interpolate)
     else:
         response_df = None
 
+    return response_df
+
+
+def _get_response_df_with_annotations(exp, data_type, stim_type, image_order=3, time_window=[-3, 3.1],
+                                      output_sampling_rate=20, interpolate=True):
+    response_df = data_formatting.get_stimulus_response_df(exp, data_type=data_type, stim_type=stim_type, image_order=image_order,
+                                                           time_window=time_window, output_sampling_rate=output_sampling_rate, interpolate=interpolate)
+    stim_df = get_all_annotated_stimulus_presentations(exp)
+    response_df = response_df.merge(
+        stim_df, how='left', on='stimulus_presentations_id', validate='m:1')
+    response_df['oeid'] = exp.ophys_experiment_id
     return response_df
 
 
