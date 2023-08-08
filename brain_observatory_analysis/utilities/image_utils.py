@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import colorsys
 import imageio
 from pathlib import Path
 from typing import Union
@@ -124,3 +125,25 @@ def get_motion_correction_crop_xy_range(oeid):
     range_x = [-min_x, -max_x]
 
     return range_y, range_x
+
+
+def generate_distinct_colors(num_colors):
+    """Generate distinct colors
+    
+    Parameters
+    ----------
+    num_colors : int
+        Number of colors to generate
+        
+    Returns
+    -------
+    list 
+        List of RGB tuples
+    """
+
+    colors = []
+    for i in range(num_colors):
+        hue = i / num_colors
+        rgb = colorsys.hsv_to_rgb(hue, 1, 1)
+        colors.append(tuple(int(c * 255) for c in rgb))
+    return colors
