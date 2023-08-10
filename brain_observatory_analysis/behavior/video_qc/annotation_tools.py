@@ -284,26 +284,22 @@ def plot_DLC_points(frame, points_to_plot, bodyparts = None):
         
     return frame
 
-def process_video(input_path, output_path, mfile, df_dlc, start_frame=1000, end_frame=2000):
+def process_video(output_path, mp4file, df_dlc, start_frame=1000, end_frame=2000):
     # Load the video file
-    movie_fullname = os.path.join(input_path, mfile)
-    movie_fullname_processed = os.path.join(output_path, mfile)
-    video = cv2.VideoCapture(movie_fullname)
-    print(movie_fullname_processed)
+    movie_fullname_processed = os.path.join(output_path, os.path.basename(mp4file))
+    video = cv2.VideoCapture(mp4file)
     # Get video properties
     fps = video.get(cv2.CAP_PROP_FPS)
     width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
-    
-
     # Create VideoWriter object to save the modified frames
     if os.path.isdir(output_path)==False:
         os.makedirs(output_path)
         print('making dir')
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # Change codec as per your requirement
     output_video = cv2.VideoWriter(movie_fullname_processed, fourcc, fps, (width, height))
-    print(f"Processing video {movie_fullname} with {fps} fps at {width}x{height}...")
+    print(f"Processing video {mp4file} with {fps} fps at {width}x{height}...")
 
     frames_to_plot = np.sort(df_dlc.level_2.unique())
     print(f'found #{len(frames_to_plot)} frames to plot')
