@@ -6,16 +6,89 @@ from scipy.signal import savgol_filter
 from scipy import signal
 import h5py
 from tqdm import tqdm
+from allensdk.brain_observatory import sync_dataset
+import json
+import glob
 
 # plotting
 import matplotlib.pyplot as plt
 from brain_observatory_analysis.ophys.experiment_loading import start_lamf_analysis
 from brain_observatory_analysis.utilities import image_utils
 import cv2
+import seaborn as sns
+
 
 
 # PATHS
-base_dir = '//allen/programs/mindscope/workgroups/learning/behavioral_video_plots'
+output_base_dir = '//allen/programs/mindscope/workgroups/learning/'
+behavioral_video_plots_dir = os.path.join(output_base_dir, 'behavioral_video_plots')
+behavioral_video_annotation_dir = os.path.join(output_base_dir, 'behavioral_video_annotation')
+
+# FUNCTIONS
+def get_h5file(path):
+    """
+    Get the h5 file from a given directory, which includes specific view folder
+    
+    Parameters
+    ----------
+    path : str
+        full path to the directory containing the h5 file
+        
+    Returns
+    -------
+    h5file : str
+        full path to the h5 file
+    """
+
+    ## TO DO: eye folder has 2 h5 files, need to figure out which one to use
+    h5file = glob.glob(os.path.join(path, '*.h5'))[0]
+    print('h5 file: {}'.format(h5file))
+    return h5file
+
+def get_mp4file(path, folder=None):
+    """
+    Get the mp4 files from a given directory, if folder is provided, then only return the mp4 file for that camera view
+    
+    Parameters
+    ----------
+    path : str
+        full path to the directory containing the mp4 files
+    folder : str
+        folder that can be used in get_moviename_from_folder to identify the camera view, default is None
+        
+    Returns
+    -------
+    mp4file : str
+        full path to the mp4 file
+    """
+
+    movies = glob.glob(os.path.join(path, '*.mp4'))
+    if folder is not None:
+        moviename = get_moviename_from_folder(folder)
+        mp4file = [m for m in movies if moviename in m][0]
+    else:
+        print('camera view was not provided, returning all mp4 files')
+        mp4file = movies
+    print('mp4 file: {}'.format(mp4file))
+    return mp4file
+
+
+def read_DLC_h5file(h5file):
+    """
+    Read in a h5 file from DLC and return a dataframe with the DLC data wiht clean column names
+    
+    Parameters
+    ----------
+    h5file : str
+        full path to the h5 file"""
+    df = pd.read_hdf(h5file, key = 'df_with_missing')
+    junk = df.keys()[0][0] #this is a hack to get the right column names
+    df = df[junk]
+    df_dlc = pd.DataFrame(df.unstack()) #long format shape
+    df_dlc = df_dlc.reset_index()
+    df_dlc = df_dlc.rename(columns={0:'value', 'level_2':'frame_number'}) #rename columns to clear names
+    print('loaded DLC data')
+    return df_dlc
 
 
 def extract_lost_frames_from_json(cam_json):
@@ -59,13 +132,113 @@ def get_frame_index(frame_file_path):
     frame_file_index = frame_file_base.replace('img', '').replace('.png', '')
     return int(frame_file_index)
 
+def get_moviename_from_folder(folder):
+    """
+    Get the movie name from the folder name
+    
+    Parameters
+    ----------
+    folder : str
+        full path to the folder containing the movie
+        
+    Returns
+    -------
+    moviename : str
+        name of the movie
+    """
+    folder_to_moviename_mapping = {'side_tracking':'Behavior', 
+                                   'eye_tracking':'Eye', 
+                                   'face_tracking':'Face'}
+    moviename = folder_to_moviename_mapping[folder]
+    return moviename
+
+def read_json(json_file):
+    """
+    Read in a json file and return a dictionary
+    
+    Parameters
+    ----------
+    json_file : str
+        full path to the json file
+    
+    Returns
+    -------
+    data : dict
+        dictionary containing the json data 
+    """
+    with open(json_file) as f:
+        data = json.load(f)
+    return data
+
+def get_jsonfile(path, folder=None):
+    """
+    Get the json files from a given directory, if folder is provided, then only return the json file for that camera view
+    
+    Parameters
+    ----------
+    path : str
+        full path to the directory containing the json files
+    folder : str
+        folder that can be used in get_moviename_from_folder to identify the camera view, default is None
+        
+    Returns
+    -------
+    jsonfile : str
+        full path to the json file
+    """
+    jsonfiles = glob.glob(os.path.join(path, '*.json'))
+    if folder is not None:
+        moviename = get_moviename_from_folder(folder)
+        jsonfile = [j for j in jsonfiles if moviename in j][0]
+    else:
+        print('camera view was not provided, returning all json files')
+        jsonfile = jsonfiles
+    print('json file: {}'.format(jsonfile))
+    return jsonfile
+
+def get_syncfile(path):
+    """
+    Get the sync file from a given directory
+    
+    Parameters
+    ----------
+    path : str
+        full path to the directory containing the sync file
+        
+    Returns
+    -------
+    syncfile : str
+        full path to the sync file
+    """
+    syncfile = glob.glob(os.path.join(path, '*.h5'))[0]
+    print('sync file: {}'.format(syncfile))
+    return syncfile
+
+def get_sync_dataset(syncfile):
+    """
+    Get the sync dataset from a given sync file
+    
+    Parameters
+    ----------
+    syncfile : str
+        full path to the sync file
+        
+    Returns
+    -------
+    sync_dataset : allensdk.brain_observatory.sync_dataset.SyncDataset
+        sync dataset
+    """
+    sync_dataset = sync_dataset.Dataset(syncfile)
+    print('sync dataset: {}'.format(sync_dataset))
+    return sync_dataset
+
 
 def get_frame_exposure_times(sync_dataset, cam_json, account_for_metadata_frame=True):
     '''
     Returns the experiment timestamps for the frames recorded in an MVR video
     
     sync_dataset should be a Dataset object built from the sync h5 file
-    cam_json is the json that MVR writes to accompany each mp4
+    cam_json is the json that MVR writes to accompany each mp4, specific to camera view
     
     account_for_metadata_frame: if TRUE prepend a NaN to the exposure times for the
     metadata frame that is prepended to the MVR video
@@ -111,7 +284,7 @@ def plot_DLC_points(frame, points_to_plot, bodyparts = None):
         
     return frame
 
-def process_video(input_path, output_path, mfile, df_dlc):
+def process_video(input_path, output_path, mfile, df_dlc, start_frame=1000, end_frame=2000):
     # Load the video file
     movie_fullname = os.path.join(input_path, mfile)
     movie_fullname_processed = os.path.join(output_path, mfile)
@@ -130,14 +303,12 @@ def process_video(input_path, output_path, mfile, df_dlc):
         print('making dir')
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # Change codec as per your requirement
     output_video = cv2.VideoWriter(movie_fullname_processed, fourcc, fps, (width, height))
-    
-    
-   
-    frame_count = 0
+    print(f"Processing video {movie_fullname} with {fps} fps at {width}x{height}...")
+
     frames_to_plot = np.sort(df_dlc.level_2.unique())
     print(f'found #{len(frames_to_plot)} frames to plot')
     
-    for this_frame in tqdm(frames_to_plot[1700:2000]):
+    for this_frame in tqdm(frames_to_plot[start_frame:end_frame]):
         video.set(cv2.CAP_PROP_POS_FRAMES, this_frame)
         ret, frame = video.read()
         
@@ -183,7 +354,7 @@ def plot_smoothed_traces(df_dlc, output_path=''):
         plt.close('all')
 
 
-def plot_downsampled_scatterplot(df_dlc, output_path):
+def plot_downsampled_scatterplot(df_dlc, output_path, window_length = 50, polyorder = 1):
     bodyparts = df_dlc['bodyparts'].unique()
     for bodypart in bodyparts:
         # figure
@@ -193,10 +364,10 @@ def plot_downsampled_scatterplot(df_dlc, output_path):
         coords = df_dlc[df_dlc.bodyparts==bodypart]['coords'].unique()
         trace = df_dlc[(df_dlc.bodyparts==bodypart) &
                       (df_dlc.coords==coords[0])][0].values
-        x = savgol_filter(trace,window_length = 50, polyorder = 1)
+        x = savgol_filter(trace,window_length = window_length, polyorder = polyorder)
         trace = df_dlc[(df_dlc.bodyparts==bodypart) &
                       (df_dlc.coords==coords[1])][0].values
-        y = savgol_filter(trace, window_length = 50, polyorder = 1)
+        y = savgol_filter(trace, window_length = window_length, polyorder = polyorder)
         likelihood = df_dlc[(df_dlc.bodyparts==bodypart) & 
                       (df_dlc.coords==coords[2])][0]
         time = df_dlc[(df_dlc.bodyparts==bodypart) &
