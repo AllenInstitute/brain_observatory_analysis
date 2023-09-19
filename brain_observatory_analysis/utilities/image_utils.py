@@ -129,15 +129,13 @@ def get_motion_correction_crop_xy_range(oeid):
 
 def generate_distinct_colors(num_colors):
     """Generate distinct colors
-    
     Parameters
     ----------
     num_colors : int
         Number of colors to generate
-        
     Returns
     -------
-    list 
+    list
         List of RGB tuples
     """
 
