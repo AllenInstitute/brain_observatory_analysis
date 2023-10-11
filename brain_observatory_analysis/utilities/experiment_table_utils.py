@@ -24,7 +24,10 @@ MOUSE_NAMES = {"603892": "Gold",
                "623972": "Neon",
                "631563": "Argon",
                "637848": "Xenon",
-               "637851": "Radon"}
+               "637851": "Radon",
+               "671833": "Indium",
+               "677594": "Lead",
+               "681417": "Tin"}
 
 # maps "reporter" column to "gcamp_name" column
 gcamp_name_map = {"Ai195(TIT2L-GC7s-ICF-IRES-tTA2)-hyg": 'GCaMP7s',
