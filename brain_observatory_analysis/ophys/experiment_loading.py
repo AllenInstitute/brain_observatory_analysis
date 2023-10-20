@@ -60,7 +60,8 @@ def start_lamf_analysis(verbose=False):
 
     # filter by lamftask1a mice
     names = ["Gold", "Silver", "Bronze", "Copper", "Nickle",
-             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron"]
+             "Titanium", "Silicon", "Aluminum", "Mercury", "Iron",
+             "Tin", "Lead", "Indium"]
     recent_expts = recent_expts[recent_expts["mouse_name"].isin(names)]
 
     recent_expts = etu.experiment_table_extended_project(recent_expts,
@@ -129,7 +130,7 @@ def get_expt_table(pkl_workaround: bool = False,
         print("Implementing pkl workaround hack will PIKA fixes LIMS/MTRAIN")
         experiments_table = expt_table_fix.get_ophys_experiment_table()
     else:
-        print("Should be on older version of allensdk branch, let MJD know if not")
+        print("Should be on 2.13.5 version of allensdk branch, let MJD know if not")
         cache = VisualBehaviorOphysProjectCache.from_lims()
         experiments_table = cache.get_ophys_experiment_table(passed_only=passed_only)
     return experiments_table
