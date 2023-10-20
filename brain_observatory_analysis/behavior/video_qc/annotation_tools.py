@@ -304,7 +304,7 @@ def get_cam_timestamps(sync_dataset, cam_json, account_for_metadata_frame=True):
     return np.array(frame_times)
 
 
-def plot_DLC_points(frame, points_to_plot, bodyparts=None):
+def plot_dlc_points_frame(frame, points_to_plot, bodyparts=None):
     """
     Plots the DLC points on a frame.
     """
@@ -320,7 +320,7 @@ def plot_DLC_points(frame, points_to_plot, bodyparts=None):
     return frame
 
 
-def process_video(output_path, mp4file, df_dlc, start_frame=1000, end_frame=2000):
+def add_dlc_datapoints_to_video(output_path, mp4file, df_dlc, start_frame=1000, end_frame=2000):
     """
     Process a video by plotting the DLC points on each frame, saving the movie and
     the frames as pngs.
@@ -364,7 +364,7 @@ def process_video(output_path, mp4file, df_dlc, start_frame=1000, end_frame=2000
 
         points_to_plot = df_dlc[df_dlc.frame_number == this_frame]
         # Process the frame
-        processed_frame = plot_DLC_points(frame, points_to_plot)
+        processed_frame = plot_dlc_points_frame(frame, points_to_plot)
         plt.imshow(processed_frame)
         if os.path.exists(os.path.join(output_path, 'frames')) is False:
             os.makedirs(os.path.join(output_path, 'frames'))
