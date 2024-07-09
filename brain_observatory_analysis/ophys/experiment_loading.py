@@ -13,15 +13,10 @@ import multiprocessing as mp
 
 from . import expt_table_fix
 import brain_observatory_analysis.utilities.file_utils as fu
-
-from allensdk.brain_observatory.behavior.behavior_project_cache import \
-    VisualBehaviorOphysProjectCache
 import brain_observatory_analysis.utilities.experiment_table_utils as etu
-
-from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import \
-    BehaviorOphysExperimentDev
-from allensdk.brain_observatory.behavior.behavior_ophys_experiment \
-    import BehaviorOphysExperiment
+from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
+from allensdk.brain_observatory.behavior.behavior_project_cache import VisualBehaviorOphysProjectCache
+from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 
 # %%
