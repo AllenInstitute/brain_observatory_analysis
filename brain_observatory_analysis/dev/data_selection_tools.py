@@ -4,12 +4,7 @@
 import numpy as np
 import pandas as pd
 # from pathlib import Path
-
-from allensdk.brain_observatory.behavior.behavior_project_cache import \
-    VisualBehaviorOphysProjectCache
-
-# TO DO: change experiment table loading to not use cache
-cache = VisualBehaviorOphysProjectCache.from_lims()
+from brain_observatory_analysis.ophys.experiment_loading import start_lamf_analysis
 
 # import logging
 # logger = logging.getLogger(__name__)
@@ -35,7 +30,10 @@ def dateformat(exp_date):
     """
     from datetime import datetime
     if exp_date is not str:
-        exp_date = str(exp_date)[:-3]  # remove 3 zeros from seconds, otherwise the str is too long
+        if len(str(exp_date)) == 26:
+            exp_date = str(exp_date)[:-3]  # remove 3 zeros from seconds, otherwise the str is too long
+        else:
+            exp_date = str(exp_date)
     date = int(datetime.strptime(exp_date, '%Y-%m-%d  %H:%M:%S.%f').strftime('%Y%m%d'))
     return date
 
@@ -45,7 +43,10 @@ def add_date_string(df):
     Adds a new column called "date" that is a string version of the date_of_acquisition column,
     with the format year-month-date, such as 20210921
     """
-    df['date'] = df['date_of_acquisition'].apply(dateformat)
+    if 'date_string' in df:
+        df['date'] = df['date_string']
+    else:
+        df['date'] = df['date_of_acquisition'].apply(dateformat)
     return df
 
 
@@ -161,11 +162,18 @@ def add_experience_level_column(cells_table, experiment_table=None):
     """
 
     if experiment_table is None:
-        experiment_table = cache.get_ophys_experiment_table()
+        experiment_table = start_lamf_analysis()
 
     cells_table = cells_table.merge(experiment_table.reset_index()[['ophys_experiment_id', 'experience_level']], on='ophys_experiment_id', how='left')
     print('adding column "exprience_level" ')
     return cells_table
+
+
+def selected_experience_levels():
+    """
+    returns a list of experience levels to be used in analysis
+    """
+    return ['Familiar', 'Novel 1', 'Novel >1']
 
 
 def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table=None):
@@ -174,19 +182,38 @@ def get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_tab
     input dataframe must have column 'cell_specimen_id', such as in ophys_cells_table
     """
 
-    if 'oexperience_level' not in cells_table.columns:
+    if 'experience_level' not in cells_table.columns:
         cells_table = add_experience_level_column(cells_table, experiment_table)
+
+    # make sure that there None experience levels are not in the table
+    sel = selected_experience_levels()
+    cells_table = cells_table[cells_table['experience_level'].isin(sel)]
 
     experience_level_counts = cells_table.groupby(['cell_specimen_id', 'experience_level']).count().reset_index().groupby(['cell_specimen_id']).count()[['experience_level']]
     cell_specimen_ids_with_all_experience_levels = experience_level_counts[experience_level_counts.experience_level == 3].index.unique()
     return cell_specimen_ids_with_all_experience_levels
 
 
-def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table, experiment_table=None):
+def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table, experiment_table=None, drop_extra_oeids=True):
     """
     returns dataframe limited to cell_specimen_ids that are present in all 3 experience levels in ['Familiar', 'Novel 1', 'Novel >1']
     input dataframe is typically ophys_cells_table but can be any df with columns 'cell_specimen_id' and 'experience_level'
     """
     cell_specimen_ids_with_all_experience_levels = get_cell_specimen_ids_with_all_experience_levels(cells_table, experiment_table)
     matched_cells_table = cells_table[cells_table.cell_specimen_id.isin(cell_specimen_ids_with_all_experience_levels)].copy()
+
+    if drop_extra_oeids:
+        oeids = experiment_table.index.values
+        matched_cells_table = matched_cells_table[matched_cells_table.ophys_experiment_id.isin(oeids)]
     return matched_cells_table
+
+
+def add_selected_session_number_column(experiment_table):
+    experiment_table['selected_session_number'] = np.nan
+    index = experiment_table[experiment_table.experience_level == 'Familiar'].index.values
+    experiment_table.loc[index, 'selected_session_number'] = 1
+    index = experiment_table[experiment_table.experience_level == 'Novel 1'].index.values
+    experiment_table.loc[index, 'selected_session_number'] = 2
+    index = experiment_table[experiment_table.experience_level == 'Novel >1'].index.values
+    experiment_table.loc[index, 'selected_session_number'] = 3
+    return experiment_table
