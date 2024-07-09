@@ -127,6 +127,7 @@ def get_motion_correction_crop_xy_range(oeid):
 
     return range_y, range_x
 
+
 def save_figure(fig, figsize, save_dir, folder, fig_title, formats=['.png', '.pdf']):
     fig_dir = os.path.join(save_dir, folder)
     if not os.path.exists(fig_dir):
@@ -136,6 +137,7 @@ def save_figure(fig, figsize, save_dir, folder, fig_title, formats=['.png', '.pd
     fig.set_size_inches(figsize)
     for f in formats:
         fig.savefig(filename + f, transparent=True, orientation='landscape', bbox_inches='tight', dpi=300, facecolor=fig.get_facecolor())
+
 
 def generate_distinct_colors(num_colors):
     """Generate distinct colors
