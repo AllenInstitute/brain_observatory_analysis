@@ -25,8 +25,7 @@ def lick_raster(extended_trials: pd.DataFrame,
                 color_trials: bool = True):
 
     from visual_behavior.utilities import flatten_list
-    from visual_behavior.translator.core.annotate import \
-        colormap, trial_translator
+    # from visual_behavior.translator.core.annotate import trial_translator
 
     lick_key = parse_lick_type(lick_type)
     print(lick_key)
@@ -51,7 +50,7 @@ def lick_raster(extended_trials: pd.DataFrame,
         extended_trials['trial'] = extended_trials.index
 
     for ii, idx in enumerate(extended_trials['trial']):
-        y_index = idx # ii is original
+        y_index = idx  # ii is original
         if len(extended_trials.loc[idx][lick_key]) > 0:
             lt = np.array(extended_trials.loc[idx][lick_key]) - \
                 extended_trials.loc[idx]['change_time']
@@ -64,13 +63,13 @@ def lick_raster(extended_trials: pd.DataFrame,
             reward_x.append(rt)
             reward_y.append(np.ones_like(rt) * y_index)
 
-        trial_type = trial_translator(extended_trials.loc[idx]['trial_type'],
-                                      extended_trials.loc[idx]['response'])
+        # trial_type = trial_translator(extended_trials.loc[idx]['trial_type'],
+        #                               extended_trials.loc[idx]['response'])
 
-        if color_trials:
-            colors = colormap(trial_type, palette)
-        else:
-            colors = 'white'
+        # if color_trials:
+        #     colors = colormap(trial_type, palette)
+        # else:
+        #     colors = 'white'
 
         # ax.axhspan(ii - 0.5, ii + 0.5,
         #            facecolor=colors, alpha=0.5,

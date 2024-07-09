@@ -3,7 +3,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Union
 
-from brain_observatory_qc.data_access.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
+
+from brain_observatory_analysis.ophys.behavior_ophys_experiment_dev import BehaviorOphysExperimentDev
 from allensdk.brain_observatory.behavior.behavior_ophys_experiment import BehaviorOphysExperiment
 
 # TODO: change to brain_observatory utilities

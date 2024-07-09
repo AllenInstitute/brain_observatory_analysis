@@ -13,7 +13,7 @@ def container_cells_table_plus_metadata(container_id: int,
 
     Parameters
     ----------
-    container_id: int 
+    container_id: int
         The ophys_container_id of the container to get cells from
     expt_table: pd.DataFrame
         The ophys_experiment_table to use. If None, use the cache's

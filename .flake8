@@ -1,6 +1,13 @@
 [flake8]
+max-line-length = 100
 ignore =
     # ignore line too long error
     E501,
     # ignore closing bracket does not match indent of opening bracket's line
-    E123,   
+    E123,
+    # ignore binary operator line break
+    W503,
+    # ignore line break before binary operator
+    W504,
+    # local variable name is assigned to but never used
+    F841,

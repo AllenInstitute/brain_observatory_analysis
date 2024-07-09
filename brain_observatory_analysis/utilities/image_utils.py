@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
 import os
+import colorsys
 import imageio
 from pathlib import Path
 from typing import Union
-import mindscope_qc.data_access.from_lims as from_lims
+import brain_observatory_qc.data_access.from_lims as from_lims
 from tifffile import TiffWriter
 import matplotlib as mpl
 
@@ -135,3 +136,22 @@ def save_figure(fig, figsize, save_dir, folder, fig_title, formats=['.png', '.pd
     fig.set_size_inches(figsize)
     for f in formats:
         fig.savefig(filename + f, transparent=True, orientation='landscape', bbox_inches='tight', dpi=300, facecolor=fig.get_facecolor())
+
+def generate_distinct_colors(num_colors):
+    """Generate distinct colors
+    Parameters
+    ----------
+    num_colors : int
+        Number of colors to generate
+    Returns
+    -------
+    list
+        List of RGB tuples
+    """
+
+    colors = []
+    for i in range(num_colors):
+        hue = i / num_colors
+        rgb = colorsys.hsv_to_rgb(hue, 1, 1)
+        colors.append(tuple(int(c * 255) for c in rgb))
+    return colors
