@@ -44,7 +44,7 @@ def add_date_string(df):
     with the format year-month-date, such as 20210921
     """
     if 'date_string' in df:
-        df['date']=df['date_string'] 
+        df['date'] = df['date_string']
     else:
         df['date'] = df['date_of_acquisition'].apply(dateformat)
     return df
@@ -207,12 +207,13 @@ def limit_to_cell_specimen_ids_matched_in_all_experience_levels(cells_table, exp
         matched_cells_table = matched_cells_table[matched_cells_table.ophys_experiment_id.isin(oeids)]
     return matched_cells_table
 
+
 def add_selected_session_number_column(experiment_table):
     experiment_table['selected_session_number'] = np.nan
     index = experiment_table[experiment_table.experience_level == 'Familiar'].index.values
-    experiment_table.loc[index, 'selected_session_number']=1
+    experiment_table.loc[index, 'selected_session_number'] = 1
     index = experiment_table[experiment_table.experience_level == 'Novel 1'].index.values
-    experiment_table.loc[index, 'selected_session_number']=2
+    experiment_table.loc[index, 'selected_session_number'] = 2
     index = experiment_table[experiment_table.experience_level == 'Novel >1'].index.values
-    experiment_table.loc[index, 'selected_session_number']=3
+    experiment_table.loc[index, 'selected_session_number'] = 3
     return experiment_table
