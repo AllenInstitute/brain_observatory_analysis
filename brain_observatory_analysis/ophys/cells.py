@@ -1,5 +1,5 @@
 import pandas as pd
-import brain_observatory_qc.data_access.from_lims_utilities as from_limsu
+import mindscope_qc.data_access.from_lims_utilities as from_limsu
 from allensdk.brain_observatory.behavior.behavior_project_cache \
     import VisualBehaviorOphysProjectCache
 

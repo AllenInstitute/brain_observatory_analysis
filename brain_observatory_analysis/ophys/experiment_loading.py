@@ -318,13 +318,10 @@ def get_ophys_expt(ophys_expt_id: int, as_dict: bool = False, log=False,
     except Exception as e:
         # log the exception
         print(e)
-        logging.exception(f"Failed to load ophys_expt_id: {ophys_expt_id}")
+        logging.exception(f"ophys_expt_id: {ophys_expt_id}")
         # logger.exception(f"Failed to load expt: {ophys_expt_id}")
         # print(f"Failed to load expt: {ophys_expt_id}")
-        if as_dict:
-            return {ophys_expt_id: None}
-        else:
-            return None
+        return {ophys_expt_id: None}
 
 
 def get_ophys_expt_multi(expt_ids: list,
