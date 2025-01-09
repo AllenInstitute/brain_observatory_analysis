@@ -1,4 +1,7 @@
 import pandas as pd
+import logging
+logger = logging.getLogger(__name__)
+
 
 ########################################################################
 # Project Agnostic constants
@@ -39,7 +42,15 @@ MOUSE_NAMES = {"603892": "Gold",
                "717824": "Chromium",
                "711414": "Beryllium",
                "710343": "Magnesium",
-               "713835": "Scandium"
+               "713835": "Scandium",
+               "721291": "Saffron",
+               "736963": "Thyme",
+               "739564": "Paprika", 
+               "747107": "Ginger",
+               "747667": "Pepper",
+               "749315": "Fennel",
+               "729417": "Cardamon",
+               "755252": "Anise",
                }
 
 # maps "reporter" column to "gcamp_name" column
@@ -112,12 +123,22 @@ def experiment_table_extended(df: pd.DataFrame):
         - 'date_string'
 
     """
+    # infer genotype column
+    genotype_col = [col for col in df.columns if "genotype" in col or "full_genotype" in col]
+    if len(genotype_col) != 1:
+        raise ValueError("genotype or full_genotype column not found")
+    genotype_col = genotype_col[0]
+
+    # if cre_line is not present, add it
+    if "cre_line" not in df.columns:
+        df = add_cre_line_column(df, genotype_col=genotype_col)
+
     df = add_n_exposure_session_type_column(df)
     df = add_session_number(df)
     df = add_session_type_num_column(df)
     df = add_bisect_layer_column(df)
     df = add_depth_order_column(df)
-    df = add_fixed_reporter_line_column(df)
+    df = add_fixed_reporter_line_column(df, genotype_col=genotype_col)
     df = add_mouse_names_columns(df)
     df = add_cre_name_column(df)
     df = add_date_string_column(df)
@@ -130,6 +151,10 @@ def experiment_table_extended(df: pd.DataFrame):
 # Project agnostic columns
 ########################################################################
 
+def add_cre_line_column(df, genotype_col="full_genotype"):
+    df["cre_line"] = df[genotype_col].apply(lambda x: x.split(';')[0].split('/')[0])
+
+    return df
 
 def add_mouse_names_columns(df: pd.DataFrame):
     """Adds a column called 'mouse_name' to expt_table #WKDF
@@ -232,13 +257,16 @@ def add_bisect_layer_column(df, bisecting_depth=220):
     df : pandas.DataFrame
 
     """
-    df.loc[:, 'bisect_layer'] = None
+    try:
+        df.loc[:, 'bisect_layer'] = None
 
-    indices = df[(df.imaging_depth < bisecting_depth)].index.values
-    df.loc[indices, 'bisect_layer'] = 'upper'
+        indices = df[(df.imaging_depth < bisecting_depth)].index.values
+        df.loc[indices, 'bisect_layer'] = 'upper'
 
-    indices = df[(df.imaging_depth > bisecting_depth)].index.values
-    df.loc[indices, 'bisect_layer'] = 'lower'
+        indices = df[(df.imaging_depth > bisecting_depth)].index.values
+        df.loc[indices, 'bisect_layer'] = 'lower'
+    except AttributeError:
+        logger.warning("imaging_depth column not found, skipping bisect_layer column")
 
     return df
 
@@ -261,9 +289,12 @@ def add_depth_order_column(df):
     will be 1. Generally the 1st planes are less than 220 um"""
 
     gb = ["ophys_session_id", "targeted_structure"]
-    df["depth_order"] = (df.groupby(gb)["imaging_depth"]
-                         .transform(lambda x: x.rank(method="dense",
-                                    ascending=True)))
+    try:
+        df["depth_order"] = (df.groupby(gb)["imaging_depth"]
+                            .transform(lambda x: x.rank(method="dense",
+                                        ascending=True)))
+    except (AttributeError, KeyError):
+        logger.warning("imaging_depth/targeted_structure column not found, skipping depth_order column")
 
     return df
 
@@ -303,10 +334,9 @@ def add_abbreviated_reporter_line_column(df):
     return df
 
 
-def add_fixed_reporter_line_column(df):
-
+def add_fixed_reporter_line_column(df, genotype_col="full_genotype"):
     def fix_reporter_line(row):
-        return row.full_genotype.split(';')[-1].split('/')[0]
+        return row[genotype_col].split(';')[-1].split('/')[0]
 
     df["reporter"] = df.apply(fix_reporter_line, axis=1)
 
