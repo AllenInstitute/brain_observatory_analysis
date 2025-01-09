@@ -120,7 +120,7 @@ def get_expt_table(pkl_workaround: bool = False,
               "\nIf you see a progress bar that is taking a long time, you are on the wrong version."
               "\n-------------------------------------------------------")
         cache = VisualBehaviorOphysProjectCache.from_lims()
-        experiments_table = cache.get_ophys_experiment_table(passed_only=passed_only)
+        experiments_table = cache.get_ophys_experiment_table()
 
     experiments_table = experiments_table.sort_values(by=["date_of_acquisition"])
     return experiments_table

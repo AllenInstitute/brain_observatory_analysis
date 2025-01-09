@@ -27,12 +27,26 @@ MOUSE_NAMES = {"603892": "Gold",
                "637851": "Radon",
                "671833": "Indium",
                "677594": "Lead",
-               "681417": "Tin"}
+               "681417": "Tin",
+               "704576": "Lithium",
+               "681721": "Sodium",
+               "690308": "Potassium",
+               "693545": "Barium",
+               "701050": "Radium",
+	           "700387": "Francium",
+	           "703340": "Rubidium",
+               "719374": "Tungsten",
+               "717824": "Chromium",
+               "711414": "Beryllium",
+               "710343": "Magnesium",
+               "713835": "Scandium"
+               }
 
 # maps "reporter" column to "gcamp_name" column
 gcamp_name_map = {"Ai195(TIT2L-GC7s-ICF-IRES-tTA2)-hyg": 'GCaMP7s',
                   "Ai210(TITL-GC7f-ICF-IRES-tTA2)-hyg": 'GCaMP7f',
-                  "Ai93(TITL-GCaMP6f)": 'GCaMP6f'}
+                  "Ai93(TITL-GCaMP6f)": 'GCaMP6f',
+                  "Oi1(TIT2L-jGCaMP8s-WPRE-ICL-IRES-tTA2)/wt": 'Oi1-jGCaMP8s'}
 
 ########################################################################
 # Primary functions

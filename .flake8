@@ -1,9 +1,10 @@
 [flake8]
-max-line-length = 100 
-ignore =
-    # ignore line too long error
-    E501,
-    # ignore closing bracket does not match indent of opening bracket's line
-    E123,
-    # ignore line break before binary operator
-    W503
+max-line-length = 100
+# use extend-ignore to not reset default ignore list: https://stackoverflow.com/a/73569444
+extend-ignore =
+                # ignore line too long error
+                E501,
+                # ignore closing bracket does not match indent of opening bracket's line
+                E123,
+                # ignore line break before binary operator
+                W503
